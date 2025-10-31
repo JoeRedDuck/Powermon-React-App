@@ -6,10 +6,11 @@ import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "reac
 
 export default function AddDevice () {
   const [device,setDevice] = useState(null)
-  const [mac, setMac] = useState('');
-  const [name, setName] = useState('');
-  const [ip, setIp] = useState('');
-  const [location, setLocation] = useState('');
+  const [mac, setMac] = useState("");
+  const [id, setID] = useState("")
+  const [name, setName] = useState("");
+  const [ip, setIp] = useState("");
+  const [location, setLocation] = useState("");
   const [machineType, setMachineType] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null)

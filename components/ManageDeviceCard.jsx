@@ -140,6 +140,13 @@ export default function ManageDeviceCard({ device, onDelete }) {
         <View style={lineStyle}></View>
 
         <View>
+          <Text style= {labelStyle}>Monitor ID</Text>
+          <Text style = {attributeStyle}>{device.id}</Text>
+        </View>
+
+        <View style={lineStyle}></View>
+
+        <View>
           <Text style = {labelStyle}>Machine Type</Text>
           <Text style = {attributeStyle}>{device.type}</Text>
         </View>
