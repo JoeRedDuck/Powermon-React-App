@@ -25,11 +25,12 @@ export default function AddDevice () {
     const base = `${apiBase.replace(/\/$/, '')}/api/v1`
   
   function clearForm() {
-  setMac('');
-  setName('');
-  setIp('');
-  setLocation('');
-  setMachineType('');
+  setMac("");
+  setName("");
+  setID("")
+  setIp("");
+  setLocation("");
+  setMachineType("");
   }
 
   const fetchDevice = async (macToGet) => {
@@ -85,6 +86,7 @@ export default function AddDevice () {
 
     const payload = {
       name: name,
+      id: id,
       mac: mac,
       machine_type: machineType,
       location: location,
@@ -136,6 +138,15 @@ export default function AddDevice () {
           placeholder="Condenser 1"
           value={name}
           onChangeText={setName}>
+        </TextInput>
+      </View>
+      <View>
+        <Text style={styles.label}>Monitor ID:</Text>
+        <TextInput 
+          style={styles.input}
+          placeholder="1"
+          value={id}
+          onChangeText={setID}>
         </TextInput>
       </View>
       <View>
