@@ -8,8 +8,7 @@ import HomeIcon from "../assets/icons/home.svg";
 import MenuIcon from "../assets/icons/menu.svg";
 import AddDeviceIcon from "../assets/icons/plus-circle.svg";
 import ManageDevicesIcon from "../assets/icons/settings.svg";
-
-
+import FilterIcon from "../assets/icons/sliders.svg";
 
 export default function RootLayout() {
   return (
@@ -26,7 +25,7 @@ function Topbar() {
   const { mac } = useGlobalSearchParams();
 
   const titles = {
-    "/": "Home",
+    "/": "Dashboard",
     "/status": "Devices",
     "/manageDevices": "Manage Devices",
     "/addDevice": (typeof mac === "string" && mac.length) ? "Edit Device" : "Add Device",
@@ -43,7 +42,7 @@ function Topbar() {
   }
 
   const topBarStyle = {
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
     paddingHorizontal: 16
 
@@ -58,14 +57,21 @@ function Topbar() {
         alignItems: "center"
 }}
     >  
-    {(title != "Home") &&(
+    {(title != "Dashboard") &&(
     <TouchableOpacity style = {topBarStyle} onPress={() => {router.back()}}>
       <BackIcon width = {32} height = {32} stroke="#FFFFFF"/>
     </TouchableOpacity>)}
 
-    <View style = {topBarStyle}>
+    <View style = {{...topBarStyle, flex: 1}}>
     <Text style = {textStyle}>{title}</Text>
     </View>
+
+    {(title == "Devices") &&(
+    <TouchableOpacity style = {topBarStyle} onPress={() => {router.back()}}>
+      <FilterIcon width = {28} height = {28} stroke="#FFFFFF"/>
+    </TouchableOpacity>)}
+    
+
     </View>
   )
 }

@@ -1,7 +1,9 @@
+import Constants from 'expo-constants';
 import { useEffect, useState } from "react";
 import { ScrollView } from "react-native";
 import ManageDeviceCard from "../components/ManageDeviceCard";
 import sortDevices from "../utils/sortDevices";
+
 
 export default function ManageDevices () {
   const [devices, setDevices] = useState([])
