@@ -33,12 +33,12 @@ export default function MetricCard ( {type="offline", value = 0} ) {
     },
     pillText: {
       fontSize: 12,
-      fontWeight: 800,
+      fontWeight: "800",
       color: "#FFFFFF"
     },
     titleText: {
       fontSize: 20,
-      fontWeight: 800
+      fontWeight: "800"
     },
     informationContainer: {
       paddingHorizontal: 14,
@@ -53,12 +53,12 @@ export default function MetricCard ( {type="offline", value = 0} ) {
     },
     value: {
       fontSize: 56,
-      fontWeight: 900,
+      fontWeight: "900",
       textAlign: "center"
     },
     deviceText: {
       fontSize: 16,
-      fontWeight: 600,
+      fontWeight: "600",
       color: "#6B7280",
       textAlign: "center"
     }

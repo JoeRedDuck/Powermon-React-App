@@ -21,7 +21,8 @@ export default function RootLayout() {
 }
 
 function Topbar() {
-
+  const filterOpen = false;
+  const filterOptions = {}
   const { mac } = useGlobalSearchParams();
 
   const titles = {

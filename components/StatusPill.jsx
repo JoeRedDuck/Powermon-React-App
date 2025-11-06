@@ -25,7 +25,7 @@ export default function StatusPill(status) {
 
   return(
     <View style= {statusPillStyle}>
-      <Text style={{fontSize: 16, color: "#FFFFFF", fontWeight: 600}}>{deviceStatus}</Text>
+      <Text style={{fontSize: 16, color: "#FFFFFF", fontWeight: "600"}}>{deviceStatus}</Text>
     </View>
   )
 }

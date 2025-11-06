@@ -20,49 +20,47 @@ export default ({ config }) => ({
         resizeMode: "contain",
         backgroundColor: "#ffffff",
         dark: {
-          backgroundColor: "#000000"
-        }
-      }
-    ]
+          backgroundColor: "#000000",
+        },
+      },
+    ],
   ],
 
   sdkVersion: "54.0.0",
   platforms: ["ios", "android", "web"],
 
   ios: {
-    supportsTablet: true
+    bundleIdentifier: "com.prozomix.powermon",
+    supportsTablet: true,
   },
 
   android: {
     ...(config.android ?? {}),
+    package: "com.prozomix.powermon",
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
       foregroundImage: "./assets/images/icon.png",
     },
-    package: "com.prozomix.powermon" // ✅ required unique package name
+    usesCleartextTraffic: true, // ✅ allows http://192.168.x.x API calls
   },
 
   web: {
     output: "static",
-    favicon: "./assets/images/favicon.png"
+    favicon: "./assets/images/favicon.png",
   },
 
   experiments: {
     typedRoutes: true,
-    reactCompiler: true
-  },
-
-  extra: {
-    ...(config.extra ?? {}),
-    apiBase: process.env.EXPO_PUBLIC_API_BASE ?? process.env.API_BASE,
-    eas: {
-      projectId: "5a5b70c9-12c1-4609-aed3-d0249d7c2b6f"
-    }
+    reactCompiler: true,
   },
 
   androidStatusBar: {
-    backgroundColor: "#ffffff"
-  }
+    backgroundColor: "#ffffff",
+  },
+
+  extra: {
+    apiBase: process.env.EXPO_PUBLIC_API_BASE ?? process.env.API_BASE ?? "http://192.168.11.175:8000",
+  },
 });

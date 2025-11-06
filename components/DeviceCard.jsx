@@ -36,7 +36,7 @@ export default function DeviceCard ({ device }) {
       <View style={cardStyle}>
 
         <View style={{flexDirection: "row", alignItems: "center", justifyContent: "space-between"}}>
-          <Text style={{fontSize: 22, fontWeight: 600}}>{device.name}</Text>
+          <Text style={{fontSize: 22, fontWeight: "600"}}>{device.name}</Text>
 
           <StatusPill status={device.status}/>
         </View>
