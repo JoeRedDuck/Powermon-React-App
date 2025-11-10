@@ -5,11 +5,14 @@ import DeviceCard from '../components/DeviceCard';
 import sortDevices from '../utils/sortDevices';
 
 
+
 export default function Status() {
 
   const [devices, setDevices] = useState([]);
   const [locations, setLocations] = useState([]);
-  const selectedLocation = null;
+  const [selectedLocation, setSelectedLocation] = useState(null)
+  const [selectedMachineType, setSelectedMachineType] = useState(null)
+  const [selectedStatus, setSelectedStatus] = useState(null)
   const TYPE_ORDER = ['IPM'];
   const LOCATION_ORDER = ['Production line'];
 
@@ -24,9 +27,12 @@ export default function Status() {
     let mounted = true;
 
     const fetchDevices = () => {
-      const url = selectedLocation 
-        ? `${base}?location=${encodeURIComponent(selectedLocation)}` 
-        : base;
+      const params = new URLSearchParams();
+      if (selectedLocation) params.append('location', selectedLocation);
+      if (selectedStatus) params.append('status', selectedStatus);
+      if (selectedMachineType) params.append('machine_type', selectedMachineType);
+      const url = `${base}${params.toString() ? `?${params}` : ''}`;
+
 
       fetch(url)
         .then(r => r.json())
@@ -50,7 +56,7 @@ export default function Status() {
       mounted = false;
       clearInterval(id);
     };
-  }, [selectedLocation]);
+  }, [selectedLocation, selectedStatus, selectedMachineType]);
 
   const orderedDevices = sortDevices(devices, TYPE_ORDER, LOCATION_ORDER)
 

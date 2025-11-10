@@ -148,7 +148,7 @@ export default function ManageDeviceCard({ device, onDelete }) {
 
         <View>
           <Text style = {labelStyle}>Machine Type</Text>
-          <Text style = {attributeStyle}>{device.type}</Text>
+          <Text style = {attributeStyle}>{device.machine_type}</Text>
         </View>
 
         <View style={lineStyle}></View>
