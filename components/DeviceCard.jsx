@@ -1,4 +1,5 @@
-import { Text, View } from "react-native";
+import { router } from "expo-router";
+import { Text, TouchableOpacity, View } from "react-native";
 import StatusPill from "../components/StatusPill";
 
 export default function DeviceCard ({ device }) {
@@ -32,7 +33,9 @@ export default function DeviceCard ({ device }) {
   }
 
   return (
-    <View style = {{width: "100%", height: "130", paddingHorizontal: 10, marginTop: 5, marginBottom: 5}}>
+    <TouchableOpacity 
+    style = {{width: "100%", height: "130", paddingHorizontal: 10, marginTop: 5, marginBottom: 5}}
+    onPress={() => router.push("/device")}>
       <View style={cardStyle}>
 
         <View style={{flexDirection: "row", alignItems: "center", justifyContent: "space-between"}}>
@@ -49,6 +52,6 @@ export default function DeviceCard ({ device }) {
         </View>
 
       </View>
-    </View>
+    </TouchableOpacity>
   )
 }

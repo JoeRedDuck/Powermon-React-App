@@ -1,9 +1,9 @@
 import Constants from 'expo-constants';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from "react";
 import { ScrollView } from "react-native";
 import DeviceCard from '../components/DeviceCard';
 import sortDevices from '../utils/sortDevices';
-
 
 
 export default function Status() {
@@ -15,6 +15,14 @@ export default function Status() {
   const [selectedStatus, setSelectedStatus] = useState(null)
   const TYPE_ORDER = ['IPM'];
   const LOCATION_ORDER = ['Production line'];
+
+  const { status, location, machine_type } = useLocalSearchParams()
+
+  useEffect(() => {
+    setSelectedLocation(location ? String(location) : null)
+    setSelectedStatus(status ? String(status) : null)
+    setSelectedMachineType(machine_type ? String(machine_type) : null)
+  }, [location,machine_type,status])
 
   useEffect(() => {
     const apiBase =

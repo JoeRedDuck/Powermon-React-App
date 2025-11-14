@@ -1,9 +1,10 @@
-import { StyleSheet, Text, View } from "react-native"
+import { router } from "expo-router";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function MetricCard ( {type="offline", value = 0} ) {
   const palette = {
-    "no-power": {accentColour: "#EF4444", pillColour: "#DC2626", title: "No Power", pillText: "No Power"},
-    "low-power": {accentColour: "#F59E0B", pillColour: "#D97706", title: "Low Power", pillText: "Low Power"},
+    "no power": {accentColour: "#EF4444", pillColour: "#DC2626", title: "No Power", pillText: "No Power"},
+    "low power": {accentColour: "#F59E0B", pillColour: "#D97706", title: "Low Power", pillText: "Low Power"},
     "offline": {accentColour: "#9CA3AF", pillColour: "#6B7280", title: "Offline Monitors", pillText: "Offline"},
     "online": {accentColour: "#22C55E", pillColour: "#16A34A", title: "Online", pillText: "Online"}
   }[type]
@@ -65,7 +66,7 @@ export default function MetricCard ( {type="offline", value = 0} ) {
   })
 
   return (
-    <View style={cardStyles.metricCard}>
+    <TouchableOpacity style={cardStyles.metricCard} onPress={() => router.push({ pathname: "/status", params: {status: type}})}>
       <View style={cardStyles.accent}></View>
       <View style={cardStyles.informationContainer}>
         <View style={cardStyles.row}>
@@ -77,6 +78,6 @@ export default function MetricCard ( {type="offline", value = 0} ) {
         <Text style={cardStyles.value}>{value}</Text>
         <Text style={cardStyles.deviceText}>Devices</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   )
 }

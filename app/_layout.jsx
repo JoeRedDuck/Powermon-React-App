@@ -1,7 +1,9 @@
+import { Picker } from "@react-native-picker/picker";
+import Constants from "expo-constants";
 import { router, Stack, useGlobalSearchParams, usePathname } from "expo-router";
-import { Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import BackIcon from "../assets/icons/arrow-left.svg";
 import DevicesIcon from "../assets/icons/grid.svg";
 import HomeIcon from "../assets/icons/home.svg";
@@ -11,17 +13,121 @@ import ManageDevicesIcon from "../assets/icons/settings.svg";
 import FilterIcon from "../assets/icons/sliders.svg";
 
 export default function RootLayout() {
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [machineTypes, setMachineTypes] = useState([])
+  const [locations, setLocations] = useState([])
+  const statuses = ["offline","online","no power", "low power"]
+
+  const pathname = usePathname()
+  const routerParams = useGlobalSearchParams()
+
+  const [location, setLocation] = useState("")
+  const [status, setStatus] = useState("")
+  const [machine_type, setMachineType] = useState("")
+
+  useEffect(() => {
+    if (pathname !== "/status" && filterOpen) setFilterOpen(false)
+  }, [pathname, filterOpen]);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const apiBase = (process.env.EXPO_PUBLIC_API_BASE || Constants.expoConfig?.extra?.apiBase || '').replace(/\/$/, '');
+    const base = `${apiBase}/api/v1`;
+
+    fetch(`${base}/machine_types`)
+      .then(r => r.json())
+      .then(setMachineTypes)
+      .catch(() => setMachineTypes([]));
+
+    fetch(`${base}/locations`)
+      .then(r => r.json())
+      .then(setLocations)
+      .catch(() => setLocations([]));
+  }, [filterOpen]);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    setLocation(routerParams.location ? String(routerParams.location) : "")
+    setStatus(routerParams.status ? String(routerParams.status) : "")
+    setMachineType(routerParams.machine_type ? String(routerParams.machine_type) : "")
+  }, [filterOpen, routerParams.location, routerParams.status, routerParams.machine_type]);
+
+  const applyFilters = () => {
+    const params = {
+      location: location || undefined,
+      machine_type: machine_type || undefined,
+      status: status || undefined
+    };
+    if (pathname === "/status") router.setParams(params);
+    else router.push({pathname: "/status", params})
+    setFilterOpen(false); 
+  }
+
   return (
     <SafeAreaView style={{ backgroundColor: "#0F1724", flex: 1 }}>
-      <Topbar />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Topbar filterOpen={filterOpen} setFilterOpen={setFilterOpen} />
+        <View style={{ flex: 1}}>
+          <Stack screenOptions={{ headerShown: false }} />
+          {filterOpen && (
+          <View style={{position: "absolute", top: 0, bottom: 0, left: 0, right: 0,  backgroundColor: "#F3F4F6"}}>
+            <View style={styles.form}>
+              <Text style={styles.menuTitle}>Filter Options</Text>
+              <View>
+                <Text style={styles.label}>Status:</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    style={styles.selector}
+                    selectedValue={status}
+                    onValueChange={(v) => setStatus(v)}>
+                    <Picker.Item label="All" value="" />
+                    {statuses.map((type) => ( <Picker.Item key={type} label={type} value={type} />))}
+                  </Picker>
+                </View>
+              </View>
+
+              <View>
+                <Text style={styles.label}>Location:</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    style={styles.selector}
+                    selectedValue={location}
+                    onValueChange={(v) => setLocation(v)}>
+                    <Picker.Item label="All" value="" />
+                    {locations.map((type) => ( <Picker.Item key={type} label={type} value={type} />))}
+                  </Picker>
+                </View>
+              </View>
+
+              <View>
+                <Text style={styles.label}>Machine Type:</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    style={styles.selector}
+                    selectedValue = {machine_type}
+                    onValueChange={(v) => setMachineType(v)}>
+
+                    <Picker.Item label="All" value="" />
+                    {machineTypes.map((type) => ( <Picker.Item key={type} label={type} value={type} /> ))}
+                    
+                  </Picker>
+                </View>
+              </View>
+                <TouchableOpacity 
+                  style={styles.applyButton}
+                  onPress={applyFilters}>
+                  <Text style={styles.applyText}>Apply</Text>
+                </TouchableOpacity>
+              
+            </View>
+          </View>)}
+        </View>
       <Bottombar />
+
     </SafeAreaView>
   );
 }
 
-function Topbar() {
-  const filterOpen = false;
+function Topbar({ filterOpen, setFilterOpen }) {
   const filterOptions = {}
   const { mac } = useGlobalSearchParams();
 
@@ -68,7 +174,7 @@ function Topbar() {
     </View>
 
     {(title == "Devices") &&(
-    <TouchableOpacity style = {topBarStyle} onPress={() => {router.back()}}>
+    <TouchableOpacity style = {topBarStyle} onPress={() => {setFilterOpen(!filterOpen)}}>
       <FilterIcon width = {28} height = {28} stroke="#FFFFFF"/>
     </TouchableOpacity>)}
     
@@ -112,7 +218,7 @@ function Bottombar() {
         <HomeIcon {...iconStyle}/>
       </TouchableOpacity>
 
-      <TouchableOpacity style = {iconBoxStyle} onPress={() => router.push("/status")}>
+      <TouchableOpacity style = {iconBoxStyle} onPress={() => router.push( "/status")}>
         <DevicesIcon {...iconStyle}/>
       </TouchableOpacity>
 
@@ -131,3 +237,39 @@ function Bottombar() {
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  label: {
+    fontSize: 20,
+  },
+  form: {
+    justifyContent: "space-evenly",
+    paddingHorizontal: 20,
+    height: "100%"
+  },
+  pickerWrapper: {
+    height: 45,
+    borderColor: "#E5E7EB",
+    borderWidth: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    marginTop: 10,
+    justifyContent: "center"
+  },
+  menuTitle : {
+    fontSize: 30
+  },
+  applyButton: {
+    backgroundColor: "#2563EA",
+    height: 45,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  applyText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 16
+  },
+})

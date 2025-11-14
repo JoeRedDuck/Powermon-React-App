@@ -19,12 +19,11 @@ export default function Index() {
         .then(setDeviceStats)   // populate dropdown
         .catch(() => setDeviceStats({}));
     }, []);
-  console.log(deviceStats["online"])
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
-      <MetricCard type="low-power" value={deviceStats["low power"]}></MetricCard>
-      <MetricCard type="no-power" value={deviceStats["no power"]}></MetricCard>
+      <MetricCard type="low power" value={deviceStats["low power"]}></MetricCard>
+      <MetricCard type="no power" value={deviceStats["no power"]}></MetricCard>
       <MetricCard type="online" value={deviceStats["online"]}></MetricCard>
       <MetricCard type="offline" value={deviceStats["offline"]}></MetricCard>
     </ScrollView>

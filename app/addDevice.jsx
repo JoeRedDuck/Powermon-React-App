@@ -67,6 +67,7 @@ export default function AddDevice () {
     if (!isEdit || !device) return;
     setMac(device.mac || '');
     setName(device.name || '');
+    setID(String(device.id || ''));
     setIp(device.ip || '');
     setLocation(device.location || '');
     setMachineType(device.machine_type || '');
@@ -86,7 +87,7 @@ export default function AddDevice () {
 
     const payload = {
       name: name,
-      id: id,
+      id: parseInt(id, 10) || 0,
       mac: mac,
       machine_type: machineType,
       location: location,
@@ -114,8 +115,10 @@ export default function AddDevice () {
       } catch {
         msg = await res.text();
       }
-      Alert.alert(msg)
-      throw new Error(msg || `Request failed (${res.status})`);
+      // Ensure msg is a string before passing to Alert
+      const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
+      Alert.alert("Error", errorMsg);
+      throw new Error(errorMsg || `Request failed (${res.status})`);
     }
 
     const data = await res.json();
@@ -146,7 +149,8 @@ export default function AddDevice () {
           style={styles.input}
           placeholder="1"
           value={id}
-          onChangeText={setID}>
+          onChangeText={setID}
+          keyboardType="numeric">
         </TextInput>
       </View>
       <View>
@@ -200,8 +204,8 @@ export default function AddDevice () {
         </TouchableOpacity>
 
         {isEdit && (
-          <TouchableOpacity style={styles.cancelButton} onPress={() => handleSubmit()}>
-            <Text style={styles.cancelText} onPress={() => {router.back()}}>Cancel</Text>
+          <TouchableOpacity style={styles.cancelButton} onPress={() => {router.back()}}>
+            <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>)}
       </View>
 
