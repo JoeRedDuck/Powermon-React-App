@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet } from "react-native";
+import 'react-native-gesture-handler';
 import MetricCard from "../components/MetricCard";
 
 

@@ -46,7 +46,7 @@ export default function AddDevice () {
     }
   };
 
-  useEffect(() => {``
+  useEffect(() => {
       const url = `${base}/machine_types`
       fetch(url)
         .then(r => r.json())
@@ -139,6 +139,7 @@ export default function AddDevice () {
         <TextInput 
           style={styles.input}
           placeholder="Condenser 1"
+          placeholderTextColor="#9CA3AF"
           value={name}
           onChangeText={setName}>
         </TextInput>
@@ -148,6 +149,7 @@ export default function AddDevice () {
         <TextInput 
           style={styles.input}
           placeholder="1"
+          placeholderTextColor="#9CA3AF"
           value={id}
           onChangeText={setID}
           keyboardType="numeric">
@@ -159,6 +161,7 @@ export default function AddDevice () {
         <TextInput 
           style={styles.input}
           placeholder="C8:C9:A3:1A:F2:DB"
+          placeholderTextColor="#9CA3AF"
           value={mac}
           onChangeText={setMac}
           editable={!isEdit}
@@ -170,6 +173,7 @@ export default function AddDevice () {
         <View style={styles.pickerWrapper}>
           <Picker
             style={styles.selector}
+            dropdownIconColor="#111827"
             selectedValue = {machineType}
             onValueChange={(v) => setMachineType(v)}>
 
@@ -185,6 +189,7 @@ export default function AddDevice () {
         <TextInput 
           style={styles.input}
           placeholder="Production Line"
+          placeholderTextColor="#9CA3AF"
           value={location}
           onChangeText={setLocation}>
         </TextInput>
@@ -194,6 +199,7 @@ export default function AddDevice () {
         <TextInput 
           style={styles.input} 
           placeholder="192.168.9.125"
+          placeholderTextColor="#9CA3AF"
           value={ip}
           onChangeText={setIp}>
         </TextInput>
@@ -222,7 +228,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     fontSize: 16,
     marginTop: 10,
-    padding: 10
+    padding: 10,
+    color: "#111827"
   },
   pickerWrapper: {
     height: 45,
@@ -267,6 +274,9 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     fontSize: 16
+  },
+  selector: {
+    color: "#111827"
   }
 })
 

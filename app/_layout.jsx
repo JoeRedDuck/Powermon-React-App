@@ -77,6 +77,7 @@ export default function RootLayout() {
                 <View style={styles.pickerWrapper}>
                   <Picker
                     style={styles.selector}
+                    dropdownIconColor="#111827"
                     selectedValue={status}
                     onValueChange={(v) => setStatus(v)}>
                     <Picker.Item label="All" value="" />
@@ -90,6 +91,7 @@ export default function RootLayout() {
                 <View style={styles.pickerWrapper}>
                   <Picker
                     style={styles.selector}
+                    dropdownIconColor="#111827"
                     selectedValue={location}
                     onValueChange={(v) => setLocation(v)}>
                     <Picker.Item label="All" value="" />
@@ -103,6 +105,7 @@ export default function RootLayout() {
                 <View style={styles.pickerWrapper}>
                   <Picker
                     style={styles.selector}
+                    dropdownIconColor="#111827"
                     selectedValue = {machine_type}
                     onValueChange={(v) => setMachineType(v)}>
 
@@ -272,4 +275,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16
   },
+  selector: {
+    color: "#111827"
+  }
 })
