@@ -31,11 +31,10 @@ export default function DeviceCard ({ device }) {
   } else {
     var power ="- "
   }
-
   return (
     <TouchableOpacity 
     style = {{width: "100%", height: "130", paddingHorizontal: 10, marginTop: 5, marginBottom: 5}}
-    onPress={() => router.push("/device")}>
+    onPress={() => router.push({pathname: "/device", params: {mac: device.mac}})}>
       <View style={cardStyle}>
 
         <View style={{flexDirection: "row", alignItems: "center", justifyContent: "space-between"}}>
