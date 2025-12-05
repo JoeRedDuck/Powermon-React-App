@@ -17,7 +17,6 @@ export default function AddDevice () {
   const [isEdit, setIsEdit] = useState(false);
   const { mac: macParam } = useLocalSearchParams();
   const [machineTypes, setMachineTypes] = useState([])
-
   const apiBase =
       process.env.EXPO_PUBLIC_API_BASE ||
       Constants.expoConfig?.extra?.apiBase ||
@@ -277,6 +276,6 @@ const styles = StyleSheet.create({
   },
   selector: {
     color: "#111827"
-  }
+  },
 })
 

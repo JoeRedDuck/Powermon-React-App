@@ -39,9 +39,9 @@ export default function Status() {
       if (selectedLocation) params.append('location', selectedLocation);
       if (selectedStatus) params.append('status', selectedStatus);
       if (selectedMachineType) params.append('machine_type', selectedMachineType);
+
+      
       const url = `${base}${params.toString() ? `?${params}` : ''}`;
-
-
       fetch(url)
         .then(r => r.json())
         .then(data => {

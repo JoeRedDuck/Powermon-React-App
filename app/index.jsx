@@ -4,7 +4,6 @@ import { ScrollView, StyleSheet } from "react-native";
 import 'react-native-gesture-handler';
 import MetricCard from "../components/MetricCard";
 
-
 export default function Index() {
   const [deviceStats, setDeviceStats] = useState({})
   const apiBase =
@@ -13,12 +12,22 @@ export default function Index() {
       '';
     const base = `${apiBase.replace(/\/$/, '')}/api/v1`
 
+  
+
   useEffect(() => {
+    const fetch_stats = () => {
       const url = `${base}/device_stats`
       fetch(url)
         .then(r => r.json())
         .then(setDeviceStats)   // populate dropdown
         .catch(() => setDeviceStats({}));
+    }
+    fetch_stats()
+    const id = setInterval(fetch_stats, 5000);
+    
+    return () => {
+      clearInterval(id);
+    };
     }, []);
 
   return (
@@ -39,3 +48,4 @@ const styles = StyleSheet.create({
     justifyContent: "space-evenly"
   }
 })
+
