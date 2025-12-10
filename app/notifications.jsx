@@ -1,30 +1,45 @@
 import * as Notifications from "expo-notifications";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+
+// import { ScrollView } from "react-native-web";
 import NotificationCard from "../components/NotificationCard";
 import { useNotifications } from "../utils/NotificationContext";
 
 export default function NotificationsScreen () {
-  const { notifications } = useNotifications();
+  const { notifications, clearAllNotifications } = useNotifications();
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        onPress = {() => sendTestNotification()}><Text>SEND THE TEST NOTIFCATION</Text></TouchableOpacity>
-      
-      {/* {notifications.map((notif) => (
-        <NotificationCard key={notif.id} notification={notif} />
-      ))} */}
-       <NotificationCard/>
-    </View>
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <TouchableOpacity
+            onPress = {() => sendTestNotification()}><Text>SEND THE TEST NOTIFCATION</Text></TouchableOpacity>
+          
+          {notifications.map((notif) => (
+            <NotificationCard key={notif.id} notification={notif} />
+          ))}
+        </ScrollView>
+        <View style={styles.clearSection}>
+          <TouchableOpacity 
+            style={styles.clearButton}
+            onPress = {() => {clearAllNotifications()}}
+          >
+            <Text style={styles.clear}>Clear All</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
   )
 }
 
 async function sendTestNotification() {
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: "Test notification",
-      body: "This is a test notification from Powermon",
-      data: { from: "test" },
+      title: "Low Power Alert",
+      body: "Pump 3 is low power",
+      data: { 
+        from: "test",
+        createdAt: new Date().toISOString()
+      },
     },
     trigger: { seconds: 1 },
     
@@ -33,6 +48,26 @@ async function sendTestNotification() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16
+    padding: 16,
+    gap: 10,
+    flex: 1
+  },
+  scroll: {
+    gap: 10
+  },
+  clear: {
+    color: "#2563EA"
+  },
+  clearButton: {
+    height: 20,
+    width: 300,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  clearSection: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 0
   },
 })
