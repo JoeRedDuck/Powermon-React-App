@@ -1,0 +1,67 @@
+{
+	"devices": [ 
+		{
+			"name": "Condenser 1",
+			"mac": "A4:CF:12:FD:9D:5E",
+			"id": "7",
+			"type": "IPM",
+			"location": "Production line",
+			"machine_type": "condenser",
+			"ipaddress": "192.168.9.125"
+		},
+		{
+			"name": "Condenser 2",
+			"mac": "C8:C9:A3:1A:B9:5D",
+			"id": "5",
+			"type": "IPM",
+			"location": "Production line",
+			"machine_type": "condenser",
+			"ipaddress": "192.168.9.126"
+		},
+		{
+			"name": "Condenser 3",
+			"mac": "C8:C9:A3:1A:B7:4E",
+			"id": "4",
+			"type": "IPM",
+			"location": "Production line",
+			"machine_type": "condenser",
+			"ipaddress": "192.168.9.129"
+		},
+		{
+			"name": "Condenser 4",
+			"mac": "DC:4F:22:51:30:F9",
+			"id": "3",
+			"type": "IPM",
+			"location": "Production line",
+			"machine_type": "condenser",
+			"ipaddress": "192.168.9.127"
+		},
+		{
+			"name": "Pump 1",
+			"mac": "C8:C9:A3:1A:F2:DB",
+			"id": "1",
+			"type": "IPM",
+			"location": "Production line",
+			"machine_type": "pump",
+			"ipaddress": "192.168.9.123"
+		},
+		{
+			"name": "Pump 2",
+			"mac": "08:3A:8D:FB:58:F5",
+			"id": "2",
+			"type": "IPM",
+			"location": "Production line",
+			"machine_type": "pump",
+			"ipaddress": "192.168.9.130"
+		},
+		{
+			"name": "Minus 80",
+			"mac": "C8:C9:A3:1A:F1:24",
+			"id": "6",
+			"type": "IPM",
+			"location": "Production line",
+			"machine_type": "pump",
+			"ipaddress": "192.168.9.132"
+		}
+	]
+}
