@@ -12,6 +12,7 @@ class Machine(Base):
     location = Column(String)
 
     monitors = relationship("Monitor", back_populates="machine")
+    polls = relationship("Poll", back_populates="machine")
 
 
 class Monitor(Base):
@@ -34,9 +35,11 @@ class Poll(Base):
     id = Column("poll_number", Integer, primary_key=True, autoincrement=True)
     poll_time = Column(DateTime)
     power_usage = Column(Integer)
+    machine_name = Column(String, ForeignKey("machine.machine_name"))
     monitor_mac = Column("device_mac_address", String,
                          ForeignKey("monitor.monitor_mac_address"))
 
+    machine = relationship("Machine")
     monitor = relationship("Monitor", back_populates="polls")
 
 

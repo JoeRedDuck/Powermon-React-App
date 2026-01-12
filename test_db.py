@@ -85,9 +85,10 @@ def test_latest_poll_logic(db_session):
 
     # Add old poll (100W) and new poll (500W)
     now = datetime.now(timezone.utc)
-    p1 = models.Poll(monitor_mac="11:22:33", power_usage=100,
+    p1 = models.Poll(monitor_mac="11:22:33", machine_name="CNC", power_usage=100,
                      poll_time=now - timedelta(minutes=10))
-    p2 = models.Poll(monitor_mac="11:22:33", power_usage=500, poll_time=now)
+    p2 = models.Poll(monitor_mac="11:22:33", machine_name="CNC",
+                     power_usage=500, poll_time=now)
     db_session.add_all([p1, p2])
     db_session.commit()
 
@@ -222,14 +223,15 @@ def test_get_power(db_session):
     cutoff = now - timedelta(hours=1)
 
     # Add some polls within the time range
-    p1 = models.Poll(monitor_mac="77:77:77", power_usage=100,
+    p1 = models.Poll(monitor_mac="77:77:77", machine_name="Test", power_usage=100,
                      poll_time=now - timedelta(minutes=30))
-    p2 = models.Poll(monitor_mac="77:77:77", power_usage=200,
+    p2 = models.Poll(monitor_mac="77:77:77", machine_name="Test", power_usage=200,
                      poll_time=now - timedelta(minutes=15))
-    p3 = models.Poll(monitor_mac="77:77:77", power_usage=150, poll_time=now)
+    p3 = models.Poll(monitor_mac="77:77:77", machine_name="Test",
+                     power_usage=150, poll_time=now)
 
     # Add one poll outside the time range (should not be returned)
-    p4 = models.Poll(monitor_mac="77:77:77", power_usage=50,
+    p4 = models.Poll(monitor_mac="77:77:77", machine_name="Test", power_usage=50,
                      poll_time=now - timedelta(hours=2))
 
     db_session.add_all([p1, p2, p3, p4])
@@ -253,10 +255,11 @@ def test_get_no_device_polls(db_session):
 
     # Add polls
     now = datetime.now(timezone.utc)
-    p1 = models.Poll(monitor_mac="88:88:88", power_usage=100, poll_time=now)
-    p2 = models.Poll(monitor_mac="88:88:88", power_usage=200,
+    p1 = models.Poll(monitor_mac="88:88:88", machine_name="Test",
+                     power_usage=100, poll_time=now)
+    p2 = models.Poll(monitor_mac="88:88:88", machine_name="Test", power_usage=200,
                      poll_time=now - timedelta(minutes=5))
-    p3 = models.Poll(monitor_mac="88:88:88", power_usage=150,
+    p3 = models.Poll(monitor_mac="88:88:88", machine_name="Test", power_usage=150,
                      poll_time=now - timedelta(minutes=10))
 
     db_session.add_all([p1, p2, p3])

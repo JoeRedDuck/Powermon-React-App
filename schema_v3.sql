@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS poll (
   poll_number SERIAL PRIMARY KEY,
   poll_time TIMESTAMP(3),
   power_usage INT,
+  machine_name VARCHAR(255), 
   device_mac_address VARCHAR(255),
+  FOREIGN KEY (machine_name) REFERENCES machine(machine_name) ON DELETE CASCADE,
   FOREIGN KEY (device_mac_address) REFERENCES monitor(monitor_mac_address) ON DELETE CASCADE
 );
 

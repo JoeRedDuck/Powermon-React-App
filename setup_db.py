@@ -64,13 +64,17 @@ def main():
         print(f"Error: {e}")
         session.rollback()
 
-    # Index
+    # Index - Updated to use machine_name (priority) for optimal query performance
     try:
         with engine.connect() as conn:
+            # Create index on machine_name since queries now prioritize machine over monitor
             conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS poll_idx ON poll (device_mac_address, poll_time DESC)"))
+                "CREATE INDEX IF NOT EXISTS poll_machine_idx ON poll (machine_name, poll_time DESC)"))
+            # Keep the old index for backward compatibility if needed
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS poll_monitor_idx ON poll (device_mac_address, poll_time DESC)"))
             conn.commit()
-        print("Index added.")
+        print("Indexes added.")
     except Exception as e:
         print(f"Index error: {e}")
 

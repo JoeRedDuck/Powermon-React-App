@@ -6,20 +6,20 @@ from typing import List, Optional, Dict, Any
 
 
 def get_devices(db: Session) -> List[Dict[str, Any]]:
-    # Sub-query for the latest poll per monitor using corrected attribute: monitor_mac
+    # Sub-query for the latest poll per machine (prioritizing machine_name)
     sub_stmt = db.query(
-        models.Poll.monitor_mac,
+        models.Poll.machine_name,
         func.max(models.Poll.poll_time).label("max_time")
-    ).group_by(models.Poll.monitor_mac).subquery()
+    ).group_by(models.Poll.machine_name).subquery()
 
     latest_poll = aliased(models.Poll)
 
     results = (
         db.query(models.Monitor, models.Machine, latest_poll)
         .join(models.Machine, models.Monitor.machine_name == models.Machine.name)
-        .outerjoin(sub_stmt, models.Monitor.mac == sub_stmt.c.monitor_mac)
+        .outerjoin(sub_stmt, models.Machine.name == sub_stmt.c.machine_name)
         .outerjoin(latest_poll, and_(
-            latest_poll.monitor_mac == sub_stmt.c.monitor_mac,
+            latest_poll.machine_name == sub_stmt.c.machine_name,
             latest_poll.poll_time == sub_stmt.c.max_time
         ))
         .all()
@@ -39,16 +39,29 @@ def get_devices(db: Session) -> List[Dict[str, Any]]:
 
 
 def get_power(db: Session, mac: str, cutoff: datetime) -> List[Dict[str, Any]]:
+    # First get the machine_name associated with this monitor MAC
+    monitor = db.query(models.Monitor).filter(
+        models.Monitor.mac == mac).first()
+    if not monitor:
+        return []
+
+    # Query polls by machine_name (priority) instead of monitor_mac
     rows = db.query(models.Poll).filter(
-        models.Poll.monitor_mac == mac,  # Updated attribute name
+        models.Poll.machine_name == monitor.machine_name,
         models.Poll.poll_time >= cutoff
     ).order_by(models.Poll.poll_time.asc()).all()
     return [{"value": r.power_usage, "date": r.poll_time} for r in rows]
 
 
 def get_no_device_polls(db: Session, mac: str) -> int:
-    # Updated attribute name
-    return db.query(models.Poll).filter(models.Poll.monitor_mac == mac).count()
+    # Get the machine_name associated with this monitor MAC
+    monitor = db.query(models.Monitor).filter(
+        models.Monitor.mac == mac).first()
+    if not monitor:
+        return 0
+
+    # Query polls by machine_name (priority) instead of monitor_mac
+    return db.query(models.Poll).filter(models.Poll.machine_name == monitor.machine_name).count()
 
 
 def get_device(db: Session, mac: str) -> Optional[Dict[str, Any]]:
@@ -116,5 +129,58 @@ def add_device(db: Session, device_data) -> bool:
         type="IPM",
         machine_name=device_data.name
     ))
+    db.commit()
+    return True
+
+
+def insert_poll(db: Session, monitor_mac: str, power_usage: int, poll_time: datetime) -> bool:
+    """
+    Insert a poll record with automatic machine_name resolution.
+
+    This function ensures:
+    1. The monitor exists in the database
+    2. The monitor is associated with a valid machine
+    3. Both monitor_mac and machine_name are saved in the poll record
+
+    Args:
+        db: Database session
+        monitor_mac: MAC address of the reporting monitor
+        power_usage: Power reading in watts
+        poll_time: Timestamp of the reading
+
+    Returns:
+        True if poll was inserted successfully, False if monitor not found
+
+    Raises:
+        IntegrityError: If machine_name foreign key constraint fails
+    """
+    # Lookup the monitor to get its associated machine_name
+    monitor = db.query(models.Monitor).filter(
+        models.Monitor.mac == monitor_mac).first()
+
+    if not monitor:
+        # Monitor doesn't exist - cannot insert poll
+        return False
+
+    if not monitor.machine_name:
+        # Monitor exists but has no machine assigned - cannot insert poll
+        raise ValueError(
+            f"Monitor {monitor_mac} has no associated machine_name")
+
+    # Verify the machine exists (defensive check for FK constraint)
+    machine = db.query(models.Machine).filter(
+        models.Machine.name == monitor.machine_name).first()
+    if not machine:
+        raise ValueError(
+            f"Machine '{monitor.machine_name}' referenced by monitor {monitor_mac} does not exist")
+
+    # Create and insert the poll with both monitor_mac and machine_name
+    poll = models.Poll(
+        monitor_mac=monitor_mac,
+        machine_name=monitor.machine_name,
+        power_usage=power_usage,
+        poll_time=poll_time
+    )
+    db.add(poll)
     db.commit()
     return True

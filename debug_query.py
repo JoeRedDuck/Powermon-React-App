@@ -28,13 +28,13 @@ except Exception as e:
 
 print("\n--- TEST 3: The Full 'get_devices' Query ---")
 try:
-    # This is the exact code from db.py
+    # This is the exact code from db.py (updated to use machine_name)
     subquery = (
         session.query(
-            models.Poll.monitor_mac,
+            models.Poll.machine_name,
             func.max(models.Poll.poll_time).label("max_time")
         )
-        .group_by(models.Poll.monitor_mac)
+        .group_by(models.Poll.machine_name)
         .subquery()
     )
 
@@ -43,9 +43,9 @@ try:
     results = (
         session.query(models.Monitor, models.Machine, latest_poll)
         .outerjoin(models.Machine, models.Monitor.machine_name == models.Machine.name)
-        .outerjoin(subquery, models.Monitor.mac == subquery.c.monitor_mac)
+        .outerjoin(subquery, models.Machine.name == subquery.c.machine_name)
         .outerjoin(latest_poll, and_(
-            latest_poll.monitor_mac == subquery.c.monitor_mac,
+            latest_poll.machine_name == subquery.c.machine_name,
             latest_poll.poll_time == subquery.c.max_time
         ))
         .all()

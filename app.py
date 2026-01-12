@@ -53,6 +53,12 @@ class DeviceUpdate(BaseModel):
     location: str | None = None
     machine_type: str | None = None
 
+
+class PollCreate(BaseModel):
+    monitor_mac: str
+    power_usage: int
+    poll_time: Optional[datetime] = None  # Defaults to now if not provided
+
 # --- Helpers ---
 
 
@@ -288,6 +294,42 @@ def create_device(device: DeviceCreate, session: Session = Depends(get_db)):
 @app.post("/api/v1/checkPoll/{mac}")
 def poll_count(mac: str, session: Session = Depends(get_db)):
     return {"count": db.get_no_device_polls(session, mac)}
+
+
+@app.post("/api/v1/polls")
+def create_poll(poll: PollCreate, session: Session = Depends(get_db)):
+    """
+    Insert a new poll record. Automatically resolves machine_name from monitor_mac.
+
+    The monitor must be registered in the database before polls can be inserted.
+    If poll_time is not provided, uses current UTC time.
+    """
+    poll_time = poll.poll_time if poll.poll_time else datetime.now(
+        timezone.utc)
+
+    try:
+        success = db.insert_poll(
+            session, poll.monitor_mac, poll.power_usage, poll_time)
+        if success:
+            return {"status": "created", "poll": poll.dict()}
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "status": "monitor_not_found",
+                    "reason": f"Monitor {poll.monitor_mac} not found. Register the device first."
+                }
+            )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "invalid_data", "reason": str(e)}
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "database_error", "reason": str(e)}
+        )
 
 
 if __name__ == "__main__":
