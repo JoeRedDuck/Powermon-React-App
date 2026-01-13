@@ -184,3 +184,47 @@ def insert_poll(db: Session, monitor_mac: str, power_usage: int, poll_time: date
     db.add(poll)
     db.commit()
     return True
+
+
+def add_notification_token(db: Session, token: str, device_name: Optional[str] = None) -> bool:
+    """
+    Add an Expo push notification token to the database.
+    Returns True if added, False if token already exists.
+    """
+    # Check if token already exists
+    existing = db.query(models.NotificationToken).filter(
+        models.NotificationToken.token == token).first()
+
+    if existing:
+        # Update device name if provided
+        if device_name:
+            existing.device_name = device_name
+            db.commit()
+        return False
+
+    # Add new token
+    new_token = models.NotificationToken(
+        token=token,
+        device_name=device_name
+    )
+    db.add(new_token)
+    db.commit()
+    return True
+
+
+def get_all_notification_tokens(db: Session) -> List[str]:
+    """Get all registered notification tokens."""
+    tokens = db.query(models.NotificationToken.token).all()
+    return [t[0] for t in tokens]
+
+
+def delete_notification_token(db: Session, token: str) -> bool:
+    """Delete a notification token. Returns True if deleted, False if not found."""
+    token_obj = db.query(models.NotificationToken).filter(
+        models.NotificationToken.token == token).first()
+
+    if token_obj:
+        db.delete(token_obj)
+        db.commit()
+        return True
+    return False

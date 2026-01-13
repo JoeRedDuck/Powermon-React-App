@@ -22,9 +22,8 @@ from database import SessionLocal, get_db
 
 # --- Config ---
 load_dotenv()
-PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
-PUSHOVER_USER = os.getenv("PUSHOVER_USER")
 UPS_CMD = shutil.which("upsc") or "/usr/bin/upsc"
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=[
@@ -59,6 +58,11 @@ class PollCreate(BaseModel):
     power_usage: int
     poll_time: Optional[datetime] = None  # Defaults to now if not provided
 
+
+class NotificationTokenCreate(BaseModel):
+    token: str
+    device_name: Optional[str] = None
+
 # --- Helpers ---
 
 
@@ -82,12 +86,42 @@ def get_device_status(device, low_threshold=50, stale_minutes=1):
     return "no power" if last_power == 0 else ("low power" if last_power < low_threshold else "online")
 
 
-def pushover(message, **kwargs):
-    if not PUSHOVER_TOKEN or not PUSHOVER_USER:
-        return
-    requests.post("https://api.pushover.net/1/messages.json", data={
-        "token": PUSHOVER_TOKEN, "user": PUSHOVER_USER, "message": message, **kwargs
-    }).raise_for_status()
+def send_expo_notification(title: str, body: str, priority: str = "default"):
+    """
+    Send push notification to all registered Expo tokens.
+    Priority: 'default', 'high' (for critical alerts)
+    """
+    with SessionLocal() as session:
+        tokens = db.get_all_notification_tokens(session)
+        if not tokens:
+            print("No notification tokens registered")
+            return
+
+        timestamp = datetime.now(timezone.utc).isoformat()
+
+        for token in tokens:
+            message = {
+                "to": token,
+                "title": title,
+                "body": body,
+                "priority": priority,
+                "sound": "default",
+                "data": {"createdAt": timestamp}
+            }
+
+            try:
+                response = requests.post(
+                    EXPO_PUSH_URL,
+                    json=message,
+                    headers={"Accept": "application/json",
+                             "Content-Type": "application/json"},
+                    timeout=5
+                )
+                if response.status_code != 200:
+                    print(
+                        f"Failed to send notification to {token}: {response.text}")
+            except Exception as e:
+                print(f"Error sending notification to {token}: {e}")
 
 # --- Background Monitors ---
 
@@ -133,7 +167,9 @@ async def alert_monitor(poll_sec=10, cooldown=300):
                         "Offline Alert: " + (f"{new_off[0]['name']}" if len(new_off) == 1 else "Multiple devices"))
 
                 if messages:
-                    pushover("\n".join(messages), priority=1)
+                    title = "Machine Alert"
+                    body = "\n".join(messages)
+                    send_expo_notification(title, body, priority="high")
                     alerted_devices.extend(new_off + new_low + new_none)
                     await asyncio.sleep(cooldown)
                 else:
@@ -155,11 +191,18 @@ async def ups_monitor(poll_sec=10):
             on_battery = "OB" in status
             if on_battery and not UPS_OUTAGE.is_set():
                 UPS_OUTAGE.set()
-                pushover("Critical Power Alert: UPS on battery",
-                         priority=2, retry=60, expire=3600)
+                send_expo_notification(
+                    "Critical Power Alert",
+                    "UPS is on battery - mains power to factory is down",
+                    priority="high"
+                )
             elif (not on_battery) and UPS_OUTAGE.is_set():
                 UPS_OUTAGE.clear()
-                pushover("Power restored: UPS on mains", priority=0)
+                send_expo_notification(
+                    "Power Restored",
+                    "UPS is back on mains power",
+                    priority="default"
+                )
             await asyncio.sleep(poll_sec)
         except Exception as e:
             print(f"UPS Error: {e}")
@@ -330,6 +373,34 @@ def create_poll(poll: PollCreate, session: Session = Depends(get_db)):
             status_code=500,
             detail={"status": "database_error", "reason": str(e)}
         )
+
+
+@app.post("/api/v1/notifications/register")
+def register_notification_token(token_data: NotificationTokenCreate, session: Session = Depends(get_db)):
+    """
+    Register an Expo push notification token.
+    The mobile app calls this endpoint to register its token for receiving notifications.
+    """
+    if db.add_notification_token(session, token_data.token, token_data.device_name):
+        return {"status": "registered", "token": token_data.token}
+    else:
+        return {"status": "already_registered", "token": token_data.token}
+
+
+@app.get("/api/v1/notifications/tokens")
+def list_notification_tokens(session: Session = Depends(get_db)):
+    """Get all registered notification tokens."""
+    tokens = db.get_all_notification_tokens(session)
+    return {"tokens": tokens, "count": len(tokens)}
+
+
+@app.delete("/api/v1/notifications/tokens/{token}")
+def delete_notification_token(token: str, session: Session = Depends(get_db)):
+    """Delete a notification token (e.g., when user logs out or uninstalls app)."""
+    if db.delete_notification_token(session, token):
+        return {"status": "deleted"}
+    else:
+        raise HTTPException(status_code=404, detail={"status": "not_found"})
 
 
 if __name__ == "__main__":
