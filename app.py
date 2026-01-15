@@ -277,8 +277,14 @@ def get_power_data(mac: str, time_range: str, bucket: str, session: Session = De
     rows = db.get_power(session, mac, cutoff)
     buckets = {}
     for r in rows:
+        # Skip rows with None values
+        if r.get("value") is None or r.get("date") is None:
+            continue
         idx = floor(
             (to_utc(r["date"]) - cutoff).total_seconds() / buck_sec[bucket])
+        # Skip negative indices (data before cutoff)
+        if idx < 0:
+            continue
         b = buckets.setdefault(idx, {"sum": 0, "count": 0})
         b["sum"] += r["value"]
         b["count"] += 1

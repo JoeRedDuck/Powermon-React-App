@@ -2,10 +2,10 @@
 """
 Test script for Expo push notification endpoints.
 """
-import pytest
-from starlette.testclient import TestClient
-from sqlalchemy import create_engine, StaticPool
-from sqlalchemy.orm import sessionmaker
+import pytest  # type: ignore
+from starlette.testclient import TestClient  # type: ignore
+from sqlalchemy import create_engine, StaticPool  # type: ignore
+from sqlalchemy.orm import sessionmaker  # type: ignore
 
 from app import app, get_db
 from database import Base
