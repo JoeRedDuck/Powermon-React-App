@@ -251,12 +251,13 @@ def test_status_endpoint(client):
 def test_poll_count(client, test_db):
     """Test poll count endpoint."""
     mac = "BB:BB:BB"
-    create_dummy_device(client, mac=mac, name="Test Device")
+    device_name = "Test Device"
+    create_dummy_device(client, mac=mac, name=device_name)
 
-    # Add some polls
-    poll1 = models.Poll(monitor_mac=mac, power_usage=100,
+    # Add some polls (must include machine_name to match device)
+    poll1 = models.Poll(monitor_mac=mac, machine_name=device_name, power_usage=100,
                         poll_time=datetime.now(timezone.utc))
-    poll2 = models.Poll(monitor_mac=mac, power_usage=200,
+    poll2 = models.Poll(monitor_mac=mac, machine_name=device_name, power_usage=200,
                         poll_time=datetime.now(timezone.utc))
     test_db.add_all([poll1, poll2])
     test_db.commit()

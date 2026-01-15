@@ -12,7 +12,7 @@ from dateutil import parser
 from dotenv import load_dotenv  # type: ignore
 from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
-from pydantic import BaseModel  # type: ignore
+from pydantic import BaseModel, validator  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from sqlalchemy import text  # type: ignore
 
@@ -44,6 +44,12 @@ class DeviceCreate(BaseModel):
     location: str
     ip: str
 
+    @validator('name', 'mac', 'machine_type', 'location', 'ip')
+    def not_empty(cls, v, field):
+        if not v or not v.strip():
+            raise ValueError(f'{field.name} cannot be empty')
+        return v.strip()
+
 
 class DeviceUpdate(BaseModel):
     name: str
@@ -51,6 +57,19 @@ class DeviceUpdate(BaseModel):
     ip: str
     location: str | None = None
     machine_type: str | None = None
+
+    @validator('name', 'ip')
+    def not_empty(cls, v, field):
+        if not v or not v.strip():
+            raise ValueError(f'{field.name} cannot be empty')
+        return v.strip()
+
+    @validator('location', 'machine_type')
+    def optional_not_empty(cls, v, field):
+        if v is not None and (not v or not v.strip()):
+            raise ValueError(
+                f'{field.name} cannot be empty string (use null instead)')
+        return v.strip() if v else None
 
 
 class PollCreate(BaseModel):

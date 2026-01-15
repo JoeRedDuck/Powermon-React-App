@@ -1,14 +1,33 @@
 #!/usr/bin/env python3
 """
 Test script for Expo push notification endpoints.
+NOTE: These are integration tests that require a running server on localhost:8000.
+Run them manually with: python test_expo_notifications.py
 """
 import requests
 import json
+import pytest
 
 BASE_URL = "http://localhost:8000"
 TEST_TOKEN = "ExponentPushToken[fQXUGcOmxBzxtQb_Iveayj]"
 
 
+def check_server_running():
+    """Check if the server is running."""
+    try:
+        response = requests.get(f"{BASE_URL}/api/v1/health", timeout=1)
+        return response.status_code == 200
+    except:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not check_server_running(),
+    reason="Server not running on localhost:8000. Start the server with: uvicorn app:app"
+)
+
+
+@pytest.mark.integration
 def test_register_token():
     """Test registering a notification token."""
     print("\n1. Testing token registration...")
@@ -24,6 +43,7 @@ def test_register_token():
     assert response.status_code == 200
 
 
+@pytest.mark.integration
 def test_list_tokens():
     """Test listing all tokens."""
     print("\n2. Testing token list...")
@@ -36,6 +56,7 @@ def test_list_tokens():
     assert TEST_TOKEN in data["tokens"]
 
 
+@pytest.mark.integration
 def test_send_notification():
     """Test sending a notification (via the send_expo_notification function)."""
     print("\n3. Testing notification send...")
@@ -45,6 +66,7 @@ def test_send_notification():
     print("   It will send to all registered tokens automatically")
 
 
+@pytest.mark.integration
 def test_delete_token():
     """Test deleting a token."""
     print("\n4. Testing token deletion...")
@@ -56,6 +78,7 @@ def test_delete_token():
     assert response.status_code == 200
 
 
+@pytest.mark.integration
 def test_list_tokens_after_delete():
     """Verify token is gone."""
     print("\n5. Verifying token was deleted...")
