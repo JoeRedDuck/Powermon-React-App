@@ -145,7 +145,7 @@ def test_delete_machine_by_name(client, test_db):
     """Test deleting a machine by its name."""
     # Import models here
     import models
-    
+
     # Create a machine without a monitor
     machine = models.Machine(name="Test Machine", type="Test", location="Lab")
     test_db.add(machine)
@@ -186,6 +186,45 @@ def test_health_endpoint(client):
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_reassign_monitor(client):
+    """Test reassigning a monitor from one machine to another."""
+    # Create two devices
+    create_dummy_device(client, mac="AA:AA:AA", name="Machine A", location="Shop")
+    create_dummy_device(client, mac="BB:BB:BB", name="Machine B", location="Shop")
+
+    # Reassign Monitor BB to Machine A
+    response = client.post("/api/v1/monitors/BB:BB:BB/reassign?machine_name=Machine A")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "reassigned"
+    assert data["monitor_mac"] == "BB:BB:BB"
+    assert data["machine_name"] == "Machine A"
+
+    # Verify Machine A now has Monitor BB
+    devices = client.get("/api/v1/devices").json()
+    machine_a = next((d for d in devices if d["name"] == "Machine A"), None)
+    assert machine_a is not None
+    assert machine_a["mac"] == "BB:BB:BB"
+
+    # Verify Machine B is now without a monitor
+    machine_b = next((d for d in devices if d["name"] == "Machine B"), None)
+    assert machine_b is not None
+    assert machine_b["mac"] is None
+
+
+def test_reassign_monitor_not_found(client):
+    """Test reassigning with nonexistent monitor or machine."""
+    create_dummy_device(client, mac="AA:AA:AA", name="Machine A", location="Shop")
+
+    # Try nonexistent monitor
+    response = client.post("/api/v1/monitors/XX:XX:XX/reassign?machine_name=Machine A")
+    assert response.status_code == 404
+
+    # Try nonexistent machine
+    response = client.post("/api/v1/monitors/AA:AA:AA/reassign?machine_name=Nonexistent")
+    assert response.status_code == 404
 
 
 def test_locations_list(client):

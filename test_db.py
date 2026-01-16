@@ -177,10 +177,83 @@ def test_delete_device(db_session):
     assert db_service.get_device(db_session, "DD:DD:DD") is None
 
 
+def test_reassign_monitor(db_session):
+    """Test reassigning a monitor from one machine to another."""
+    # Create two machines with monitors
+    data1 = MockDeviceData("Machine A", "AA:AA:AA", "Shop", "Type A")
+    data2 = MockDeviceData("Machine B", "BB:BB:BB", "Shop", "Type B")
+    db_service.add_device(db_session, data1)
+    db_service.add_device(db_session, data2)
+
+    # Verify initial setup
+    monitor_a = db_session.query(models.Monitor).filter_by(mac="AA:AA:AA").first()
+    monitor_b = db_session.query(models.Monitor).filter_by(mac="BB:BB:BB").first()
+    assert monitor_a.machine_name == "Machine A"
+    assert monitor_b.machine_name == "Machine B"
+
+    # Reassign Monitor B to Machine A (Monitor A should become orphaned)
+    success = db_service.reassign_monitor(db_session, "BB:BB:BB", "Machine A")
+    assert success is True
+
+    # Verify reassignment
+    db_session.refresh(monitor_a)
+    db_session.refresh(monitor_b)
+    assert monitor_a.machine_name is None  # Orphaned
+    assert monitor_b.machine_name == "Machine A"  # Reassigned
+
+    # Verify Machine B is now without a monitor
+    devices = db_service.get_devices(db_session)
+    machine_b_device = next((d for d in devices if d["name"] == "Machine B"), None)
+    assert machine_b_device is not None
+    assert machine_b_device["mac"] is None  # No monitor assigned
+
+
+def test_reassign_monitor_with_polls(db_session):
+    """Test that reassigning a monitor doesn't affect poll ownership."""
+    # Create machine with monitor
+    data = MockDeviceData("CNC", "CC:CC:CC", "Shop", "CNC")
+    db_service.add_device(db_session, data)
+
+    # Add polls for the machine
+    now = datetime.now(timezone.utc)
+    db_service.insert_poll(db_session, "CC:CC:CC", 1000, now - timedelta(minutes=5))
+    db_service.insert_poll(db_session, "CC:CC:CC", 1100, now)
+
+    # Create a second machine and monitor
+    data2 = MockDeviceData("Mill", "DD:DD:DD", "Shop", "Mill")
+    db_service.add_device(db_session, data2)
+
+    # Reassign Monitor CC to Mill machine
+    success = db_service.reassign_monitor(db_session, "CC:CC:CC", "Mill")
+    assert success is True
+
+    # Verify polls still belong to CNC machine (not moved with monitor)
+    cnc_polls = db_session.query(models.Poll).filter_by(machine_name="CNC").all()
+    assert len(cnc_polls) == 2
+    assert all(p.monitor_mac == "CC:CC:CC" for p in cnc_polls)
+
+    # Mill should have no polls yet
+    mill_polls = db_session.query(models.Poll).filter_by(machine_name="Mill").all()
+    assert len(mill_polls) == 0
+
+
+def test_reassign_monitor_nonexistent(db_session):
+    """Test reassigning with nonexistent monitor or machine."""
+    data = MockDeviceData("Machine", "AA:AA:AA", "Shop", "Type")
+    db_service.add_device(db_session, data)
+
+    # Try to reassign nonexistent monitor
+    assert db_service.reassign_monitor(db_session, "XX:XX:XX", "Machine") is False
+
+    # Try to reassign to nonexistent machine
+    assert db_service.reassign_monitor(db_session, "AA:AA:AA", "Nonexistent") is False
+
+
 def test_delete_machine_by_name(db_session):
     """Test deleting a machine by name (without monitor)."""
     # Create a machine without a monitor
-    machine = models.Machine(name="Standalone Machine", type="Test", location="Lab")
+    machine = models.Machine(name="Standalone Machine",
+                             type="Test", location="Lab")
     db_session.add(machine)
     db_session.commit()
 
@@ -189,7 +262,8 @@ def test_delete_machine_by_name(db_session):
     assert "Standalone Machine" in machines
 
     # Delete by machine name
-    assert db_service.delete_machine_by_name(db_session, "Standalone Machine") is True
+    assert db_service.delete_machine_by_name(
+        db_session, "Standalone Machine") is True
 
     # Verify deletion
     machines = [d["name"] for d in db_service.get_devices(db_session)]

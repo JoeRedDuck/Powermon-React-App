@@ -354,6 +354,26 @@ def edit_device(mac: str, device: DeviceUpdate, session: Session = Depends(get_d
     raise HTTPException(status_code=404, detail={"status": "not_found"})
 
 
+@app.post("/api/v1/monitors/{monitor_mac}/reassign")
+def reassign_monitor(monitor_mac: str, machine_name: str = Query(...), session: Session = Depends(get_db)):
+    """
+    Reassign a monitor to a different machine.
+    
+    - The monitor will be associated with the new machine
+    - The old monitor on the target machine (if any) will be orphaned
+    - Polls stay with machine_name, not the monitor
+    
+    Query params:
+        machine_name: The name of the machine to assign the monitor to
+    """
+    if db.reassign_monitor(session, monitor_mac, machine_name):
+        return {"status": "reassigned", "monitor_mac": monitor_mac, "machine_name": machine_name}
+    raise HTTPException(status_code=404, detail={
+        "status": "not_found", 
+        "reason": "Monitor or machine not found"
+    })
+
+
 @app.post("/api/v1/devices")
 def create_device(device: DeviceCreate, session: Session = Depends(get_db)):
     if db.add_device(session, device):
