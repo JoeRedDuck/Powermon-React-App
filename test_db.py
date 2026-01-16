@@ -177,6 +177,34 @@ def test_delete_device(db_session):
     assert db_service.get_device(db_session, "DD:DD:DD") is None
 
 
+def test_delete_machine_by_name(db_session):
+    """Test deleting a machine by name (without monitor)."""
+    # Create a machine without a monitor
+    machine = models.Machine(name="Standalone Machine", type="Test", location="Lab")
+    db_session.add(machine)
+    db_session.commit()
+
+    # Verify machine exists
+    machines = [d["name"] for d in db_service.get_devices(db_session)]
+    assert "Standalone Machine" in machines
+
+    # Delete by machine name
+    assert db_service.delete_machine_by_name(db_session, "Standalone Machine") is True
+
+    # Verify deletion
+    machines = [d["name"] for d in db_service.get_devices(db_session)]
+    assert "Standalone Machine" not in machines
+
+
+def test_delete_device_with_null_mac(db_session):
+    """Test that delete_device handles null MAC addresses gracefully."""
+    # Should return False for null/None MAC addresses
+    assert db_service.delete_device(db_session, None) is False
+    assert db_service.delete_device(db_session, "null") is False
+    assert db_service.delete_device(db_session, "NULL") is False
+    assert db_service.delete_device(db_session, "none") is False
+
+
 def test_get_locations(db_session):
     """Test getting unique locations."""
     data1 = MockDeviceData("Dev1", "11:11:11", "Shop", "CNC")

@@ -141,6 +141,34 @@ def test_delete_device(client):
     assert response.status_code == 404
 
 
+def test_delete_machine_by_name(client, test_db):
+    """Test deleting a machine by its name."""
+    # Import models here
+    import models
+    
+    # Create a machine without a monitor
+    machine = models.Machine(name="Test Machine", type="Test", location="Lab")
+    test_db.add(machine)
+    test_db.commit()
+
+    # Verify machine exists in device list
+    response = client.get("/api/v1/devices")
+    devices = response.json()
+    machine_names = [d["name"] for d in devices]
+    assert "Test Machine" in machine_names
+
+    # Delete by machine name
+    delete_res = client.delete("/api/v1/machines/Test Machine")
+    assert delete_res.status_code == 200
+    assert delete_res.json()["status"] == "deleted"
+
+    # Verify deletion
+    response = client.get("/api/v1/devices")
+    devices = response.json()
+    machine_names = [d["name"] for d in devices]
+    assert "Test Machine" not in machine_names
+
+
 def test_duplicate_device_prevention(client):
     """Test that duplicate MAC addresses are rejected."""
     mac = "EE:FF:00"

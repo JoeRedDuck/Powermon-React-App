@@ -81,22 +81,46 @@ def get_machine_types(db: Session) -> List[str]:
     return [r[0] for r in db.query(models.Machine.type).distinct().filter(models.Machine.type.isnot(None)).all()]
 
 
+def delete_machine_by_name(db: Session, machine_name: str) -> bool:
+    """Delete a machine by its name. Also deletes any associated monitors."""
+    machine = db.query(models.Machine).filter(
+        models.Machine.name == machine_name).first()
+    if not machine:
+        return False
+    
+    # Delete any monitors associated with this machine
+    monitors = db.query(models.Monitor).filter(
+        models.Monitor.machine_name == machine_name).all()
+    for monitor in monitors:
+        db.delete(monitor)
+    
+    # Delete the machine
+    db.delete(machine)
+    db.commit()
+    return True
+
+
 def delete_device(db: Session, mac: str) -> bool:
+    """Delete a device by MAC address. Also deletes the associated machine."""
+    # Handle null/None MAC addresses
+    if not mac or mac.lower() == 'null' or mac.lower() == 'none':
+        return False
+    
     monitor = db.query(models.Monitor).filter(
         models.Monitor.mac == mac).first()
     if monitor:
         machine_name = monitor.machine_name
-        
+
         # Delete the monitor
         db.delete(monitor)
-        
+
         # Delete associated machine if it exists
         if machine_name:
             machine = db.query(models.Machine).filter(
                 models.Machine.name == machine_name).first()
             if machine:
                 db.delete(machine)
-        
+
         db.commit()
         return True
     return False

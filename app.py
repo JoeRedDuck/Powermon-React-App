@@ -341,6 +341,12 @@ def remove_device(mac: str, session: Session = Depends(get_db)):
     return {"status": "deleted" if db.delete_device(session, mac) else "not_deleted"}
 
 
+@app.delete("/api/v1/machines/{machine_name}")
+def remove_machine(machine_name: str, session: Session = Depends(get_db)):
+    """Delete a machine by its name. Use this for machines without monitors."""
+    return {"status": "deleted" if db.delete_machine_by_name(session, machine_name) else "not_deleted"}
+
+
 @app.put("/api/v1/devices/{mac}")
 def edit_device(mac: str, device: DeviceUpdate, session: Session = Depends(get_db)):
     if db.update_device(session, mac, device):
