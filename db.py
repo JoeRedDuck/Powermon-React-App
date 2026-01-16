@@ -16,7 +16,7 @@ def get_devices(db: Session) -> List[Dict[str, Any]]:
 
     results = (
         db.query(models.Monitor, models.Machine, latest_poll)
-        .join(models.Machine, models.Monitor.machine_name == models.Machine.name)
+        .outerjoin(models.Monitor, models.Monitor.machine_name == models.Machine.name)
         .outerjoin(sub_stmt, models.Machine.name == sub_stmt.c.machine_name)
         .outerjoin(latest_poll, and_(
             latest_poll.machine_name == sub_stmt.c.machine_name,
@@ -26,10 +26,10 @@ def get_devices(db: Session) -> List[Dict[str, Any]]:
     )
 
     return [{
-        "mac": m.mac,
-        "id": m.id,
-        "name": m.machine_name,
-        "type": m.type,
+        "mac": m.mac if m else None,
+        "id": m.id if m else None,
+        "name": mach.name,
+        "type": m.type if m else None,
         "machine_type": mach.type,
         "location": mach.location,
         "last_seen": p.poll_time if p else None,
@@ -72,6 +72,11 @@ def get_locations(db: Session) -> List[str]:
     return [r[0] for r in db.query(models.Machine.location).distinct().filter(models.Machine.location.isnot(None)).all()]
 
 
+def get_monitors(db: Session) -> List[Dict[str, Any]]:
+    results = db.query(models.Monitor).all()
+    return [{"mac": m.mac, "id": m.id, "name": m.machine_name} for m in results]
+
+
 def get_machine_types(db: Session) -> List[str]:
     return [r[0] for r in db.query(models.Machine.type).distinct().filter(models.Machine.type.isnot(None)).all()]
 
@@ -80,7 +85,18 @@ def delete_device(db: Session, mac: str) -> bool:
     monitor = db.query(models.Monitor).filter(
         models.Monitor.mac == mac).first()
     if monitor:
+        machine_name = monitor.machine_name
+        
+        # Delete the monitor
         db.delete(monitor)
+        
+        # Delete associated machine if it exists
+        if machine_name:
+            machine = db.query(models.Machine).filter(
+                models.Machine.name == machine_name).first()
+            if machine:
+                db.delete(machine)
+        
         db.commit()
         return True
     return False
