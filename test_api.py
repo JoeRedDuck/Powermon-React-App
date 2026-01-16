@@ -60,8 +60,7 @@ def create_dummy_device(client, mac="AA:BB:CC", name="Lathe 1", machine_type="CN
         "name": name,
         "mac": mac,
         "machine_type": machine_type,
-        "location": location,
-        "ip": "192.168.1.100"
+        "location": location
     })
 
 # --- TESTS ---
@@ -114,7 +113,6 @@ def test_update_device(client):
     # Update device
     update_res = client.put(f"/api/v1/devices/{mac}", json={
         "name": "Mill",
-        "ip": "192.168.1.101",
         "location": "Workshop Area",
         "machine_type": "Mill"
     })
@@ -125,7 +123,6 @@ def test_update_device(client):
     response = client.get(f"/api/v1/devices/{mac}")
     device = response.json()
     assert device["location"] == "Workshop Area"
-    assert device["ip"] == "192.168.1.101"
 
 
 def test_delete_device(client):
@@ -278,7 +275,6 @@ def test_update_nonexistent_device(client):
     """Test updating a device that doesn't exist."""
     response = client.put("/api/v1/devices/NONEXISTENT", json={
         "name": "Test",
-        "ip": "1.1.1.1",
         "location": "Test",
         "machine_type": "Test"
     })

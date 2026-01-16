@@ -42,9 +42,8 @@ class DeviceCreate(BaseModel):
     mac: str
     machine_type: str
     location: str
-    ip: str
 
-    @validator('name', 'mac', 'machine_type', 'location', 'ip')
+    @validator('name', 'mac', 'machine_type', 'location')
     def not_empty(cls, v):
         if not v or not v.strip():
             raise ValueError('Field cannot be empty')
@@ -54,11 +53,10 @@ class DeviceCreate(BaseModel):
 class DeviceUpdate(BaseModel):
     name: str
     id: Optional[int] = None
-    ip: str
     location: str | None = None
     machine_type: str | None = None
 
-    @validator('name', 'ip')
+    @validator('name')
     def not_empty(cls, v):
         if not v or not v.strip():
             raise ValueError('Field cannot be empty')

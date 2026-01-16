@@ -25,10 +25,9 @@ def db_session():
 
 
 class MockDeviceData:
-    def __init__(self, name, mac, ip, location, machine_type, id=1):
+    def __init__(self, name, mac, location, machine_type, id=1):
         self.name = name
         self.mac = mac
-        self.ip = ip
         self.location = location
         self.machine_type = machine_type
         self.id = id
@@ -38,7 +37,7 @@ class MockDeviceData:
 
 def test_add_and_get_device(db_session):
     """Test adding a device and retrieving it."""
-    data = MockDeviceData("Lathe 1", "AA:BB:CC", "1.1.1.1", "Shop", "Lathe")
+    data = MockDeviceData("Lathe 1", "AA:BB:CC", "Shop", "Lathe")
 
     # 1. Add Device
     assert db_service.add_device(db_session, data) is True
@@ -55,7 +54,6 @@ def test_add_and_get_device(db_session):
         models.Monitor).filter_by(mac="AA:BB:CC").first()
     assert monitor is not None
     assert monitor.machine_name == "Lathe 1"
-    assert monitor.ip == "1.1.1.1"
 
     # 4. Check Retrieval (Join logic)
     devs = db_service.get_devices(db_session)
@@ -68,7 +66,7 @@ def test_add_and_get_device(db_session):
 
 def test_duplicate_device_prevention(db_session):
     """Test that duplicate MAC addresses are prevented."""
-    data = MockDeviceData("Lathe 1", "AA:BB:CC", "1.1.1.1", "Shop", "Lathe")
+    data = MockDeviceData("Lathe 1", "AA:BB:CC", "Shop", "Lathe")
 
     # Add first device
     assert db_service.add_device(db_session, data) is True
@@ -80,7 +78,7 @@ def test_duplicate_device_prevention(db_session):
 def test_latest_poll_logic(db_session):
     """Test that get_device returns the latest poll data."""
     # Add device
-    data = MockDeviceData("CNC", "11:22:33", "1.1.1.1", "Shop", "CNC")
+    data = MockDeviceData("CNC", "11:22:33", "Shop", "CNC")
     db_service.add_device(db_session, data)
 
     # Add old poll (100W) and new poll (500W)
@@ -102,7 +100,7 @@ def test_latest_poll_logic(db_session):
 def test_update_device_location(db_session):
     """Test updating device location."""
     # 1. Setup Device at "Old Location"
-    data = MockDeviceData("Drill", "DD:00:11", "1.1.1.1",
+    data = MockDeviceData("Drill", "DD:00:11",
                           "Old Location", "Drill")
     db_service.add_device(db_session, data)
 
@@ -112,7 +110,7 @@ def test_update_device_location(db_session):
 
     # 2. Update to "New Location"
     update_data = MockDeviceData(
-        "Drill", "DD:00:11", "1.1.1.2", "New Location", "Drill")
+        "Drill", "DD:00:11", "New Location", "Drill")
     success = db_service.update_device(db_session, "DD:00:11", update_data)
     assert success is True
 
@@ -124,14 +122,13 @@ def test_update_device_location(db_session):
     d = db_service.get_device(db_session, "DD:00:11")
     assert d is not None
     assert d['location'] == "New Location"
-    assert d['ip'] == "1.1.1.2"
 
 
 def test_reassign_monitor_to_new_machine(db_session):
     """Test reassigning a monitor to a new machine."""
     # 1. Setup Monitor attached to "Machine A"
     data = MockDeviceData("Machine A", "FF:FF:FF",
-                          "1.1.1.1", "Room 1", "Type A")
+                          "Room 1", "Type A")
     db_service.add_device(db_session, data)
 
     # 2. Update Monitor to attach to "Machine B" (New Machine)
@@ -149,7 +146,7 @@ def test_reassign_monitor_to_new_machine(db_session):
     # Based on db.py update_device implementation, it updates the Machine
     # but doesn't reassign the monitor. Let's test what it actually does:
     update_data = MockDeviceData(
-        "Machine A", "FF:FF:FF", "1.1.1.2", "Room 2", "Type B")
+        "Machine A", "FF:FF:FF", "Room 2", "Type B")
     db_service.update_device(db_session, "FF:FF:FF", update_data)
 
     # Verify - the monitor should still point to Machine A
@@ -167,7 +164,7 @@ def test_reassign_monitor_to_new_machine(db_session):
 
 def test_delete_device(db_session):
     """Test deleting a device."""
-    data = MockDeviceData("Del", "DD:DD:DD", "1.1.1.1", "Shop", "Type")
+    data = MockDeviceData("Del", "DD:DD:DD", "Shop", "Type")
     db_service.add_device(db_session, data)
 
     # Verify device exists
@@ -182,9 +179,9 @@ def test_delete_device(db_session):
 
 def test_get_locations(db_session):
     """Test getting unique locations."""
-    data1 = MockDeviceData("Dev1", "11:11:11", "1.1.1.1", "Shop", "CNC")
-    data2 = MockDeviceData("Dev2", "22:22:22", "1.1.1.2", "Workshop", "Lathe")
-    data3 = MockDeviceData("Dev3", "33:33:33", "1.1.1.3", "Shop", "Mill")
+    data1 = MockDeviceData("Dev1", "11:11:11", "Shop", "CNC")
+    data2 = MockDeviceData("Dev2", "22:22:22", "Workshop", "Lathe")
+    data3 = MockDeviceData("Dev3", "33:33:33", "Shop", "Mill")
 
     db_service.add_device(db_session, data1)
     db_service.add_device(db_session, data2)
@@ -198,9 +195,9 @@ def test_get_locations(db_session):
 
 def test_get_machine_types(db_session):
     """Test getting unique machine types."""
-    data1 = MockDeviceData("Dev1", "44:44:44", "1.1.1.1", "Shop", "CNC")
-    data2 = MockDeviceData("Dev2", "55:55:55", "1.1.1.2", "Shop", "Lathe")
-    data3 = MockDeviceData("Dev3", "66:66:66", "1.1.1.3", "Shop", "CNC")
+    data1 = MockDeviceData("Dev1", "44:44:44", "Shop", "CNC")
+    data2 = MockDeviceData("Dev2", "55:55:55", "Shop", "Lathe")
+    data3 = MockDeviceData("Dev3", "66:66:66", "Shop", "CNC")
 
     db_service.add_device(db_session, data1)
     db_service.add_device(db_session, data2)
@@ -215,7 +212,7 @@ def test_get_machine_types(db_session):
 def test_get_power(db_session):
     """Test getting power data for a device."""
     # Add device
-    data = MockDeviceData("Test", "77:77:77", "1.1.1.1", "Shop", "Test")
+    data = MockDeviceData("Test", "77:77:77", "Shop", "Test")
     db_service.add_device(db_session, data)
 
     # Add polls
@@ -250,7 +247,7 @@ def test_get_power(db_session):
 def test_get_no_device_polls(db_session):
     """Test getting poll count for a device."""
     # Add device
-    data = MockDeviceData("Test", "88:88:88", "1.1.1.1", "Shop", "Test")
+    data = MockDeviceData("Test", "88:88:88", "Shop", "Test")
     db_service.add_device(db_session, data)
 
     # Add polls
@@ -284,5 +281,5 @@ def test_empty_database(db_session):
     assert db_service.delete_device(db_session, "NONEXISTENT") is False
 
     # Update non-existent device
-    data = MockDeviceData("Test", "TEST:MAC", "1.1.1.1", "Shop", "Test")
+    data = MockDeviceData("Test", "TEST:MAC", "Shop", "Test")
     assert db_service.update_device(db_session, "NONEXISTENT", data) is False

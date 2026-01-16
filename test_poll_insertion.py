@@ -23,10 +23,9 @@ def db_session():
 
 
 class MockDeviceData:
-    def __init__(self, name, mac, ip, location, machine_type, id=1):
+    def __init__(self, name, mac, location, machine_type, id=1):
         self.name = name
         self.mac = mac
-        self.ip = ip
         self.location = location
         self.machine_type = machine_type
         self.id = id
@@ -35,7 +34,7 @@ class MockDeviceData:
 def test_insert_poll_success(db_session):
     """Test successful poll insertion with machine_name resolution."""
     # Setup: Add a device
-    data = MockDeviceData("CNC Machine", "AA:BB:CC", "1.1.1.1", "Shop", "CNC")
+    data = MockDeviceData("CNC Machine", "AA:BB:CC", "Shop", "CNC")
     db_service.add_device(db_session, data)
 
     # Insert poll using new helper function
@@ -72,7 +71,6 @@ def test_insert_poll_no_machine_assigned(db_session):
     monitor = models.Monitor(
         mac="BB:BB:BB",
         id=1,
-        ip="1.1.1.1",
         type="IPM",
         machine_name=None  # No machine assigned
     )
@@ -91,7 +89,6 @@ def test_insert_poll_machine_doesnt_exist(db_session):
     monitor = models.Monitor(
         mac="CC:CC:CC",
         id=1,
-        ip="1.1.1.1",
         type="IPM",
         machine_name="NonExistentMachine"
     )
@@ -107,7 +104,7 @@ def test_insert_poll_machine_doesnt_exist(db_session):
 def test_insert_poll_multiple_polls_same_machine(db_session):
     """Test multiple polls can be inserted for the same machine."""
     # Setup device
-    data = MockDeviceData("Mill", "DD:DD:DD", "1.1.1.1", "Shop", "Mill")
+    data = MockDeviceData("Mill", "DD:DD:DD", "Shop", "Mill")
     db_service.add_device(db_session, data)
 
     # Insert multiple polls
@@ -138,7 +135,7 @@ def test_insert_poll_data_stays_with_machine_after_monitor_change(db_session):
     that polls are correctly associated with machine_name.
     """
     # Setup initial device
-    data = MockDeviceData("Lathe", "EE:EE:EE", "1.1.1.1", "Shop", "Lathe")
+    data = MockDeviceData("Lathe", "EE:EE:EE", "Shop", "Lathe")
     db_service.add_device(db_session, data)
 
     # Insert polls with first monitor
@@ -150,7 +147,6 @@ def test_insert_poll_data_stays_with_machine_after_monitor_change(db_session):
     new_monitor = models.Monitor(
         mac="FF:FF:FF",
         id=2,
-        ip="1.1.1.2",
         type="IPM",
         machine_name="Lathe"
     )

@@ -51,7 +51,6 @@ def main():
         new_monitor = models.Monitor(
             mac=device["mac"],
             id=int(device["id"]),
-            ip=device["ipaddress"],
             type=device["type"],
             machine_name=machine_name
         )

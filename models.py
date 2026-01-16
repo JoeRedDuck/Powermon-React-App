@@ -20,7 +20,6 @@ class Monitor(Base):
 
     mac = Column("monitor_mac_address", String, primary_key=True)
     id = Column("monitor_id", Integer)
-    ip = Column("monitor_ip", String)
     type = Column(String)
 
     machine_name = Column(String, ForeignKey("machine.machine_name"))

@@ -29,7 +29,6 @@ def get_devices(db: Session) -> List[Dict[str, Any]]:
         "mac": m.mac,
         "id": m.id,
         "name": m.machine_name,
-        "ip": m.ip,
         "type": m.type,
         "machine_type": mach.type,
         "location": mach.location,
@@ -94,7 +93,6 @@ def update_device(db: Session, mac: str, device_data) -> bool:
         return False
 
     monitor.id = device_data.id
-    monitor.ip = device_data.ip
 
     # Update machine info linked to this monitor
     machine = db.query(models.Machine).filter(
@@ -125,7 +123,6 @@ def add_device(db: Session, device_data) -> bool:
     db.add(models.Monitor(
         mac=device_data.mac,
         id=device_data.id,
-        ip=device_data.ip,
         type="IPM",
         machine_name=device_data.name
     ))
