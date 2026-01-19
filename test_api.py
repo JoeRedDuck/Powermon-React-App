@@ -190,26 +190,33 @@ def test_health_endpoint(client):
 
 def test_reassign_monitor(client):
     """Test reassigning a monitor from one machine to another."""
-    # Create two devices
+    # Create two devices with specific IDs
     create_dummy_device(client, mac="AA:AA:AA",
                         name="Machine A", location="Shop")
-    create_dummy_device(client, mac="BB:BB:BB",
-                        name="Machine B", location="Shop")
+    response = client.post("/api/v1/devices", json={
+        "name": "Machine B",
+        "mac": "BB:BB:BB",
+        "machine_type": "CNC",
+        "location": "Shop",
+        "id": 2
+    })
+    assert response.status_code == 200
 
-    # Reassign Monitor BB to Machine A
+    # Reassign Monitor with ID 2 to Machine A
     response = client.post(
-        "/api/v1/monitors/BB:BB:BB/reassign?machine_name=Machine A")
+        "/api/v1/monitors/2/reassign?machine_name=Machine A")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "reassigned"
-    assert data["monitor_mac"] == "BB:BB:BB"
+    assert data["monitor_id"] == 2
     assert data["machine_name"] == "Machine A"
 
-    # Verify Machine A now has Monitor BB
+    # Verify Machine A now has Monitor with ID 2 (MAC BB:BB:BB)
     devices = client.get("/api/v1/devices").json()
     machine_a = next((d for d in devices if d["name"] == "Machine A"), None)
     assert machine_a is not None
     assert machine_a["mac"] == "BB:BB:BB"
+    assert machine_a["id"] == 2
 
     # Verify Machine B is now without a monitor
     machine_b = next((d for d in devices if d["name"] == "Machine B"), None)
@@ -219,17 +226,23 @@ def test_reassign_monitor(client):
 
 def test_reassign_monitor_not_found(client):
     """Test reassigning with nonexistent monitor or machine."""
-    create_dummy_device(client, mac="AA:AA:AA",
-                        name="Machine A", location="Shop")
+    response = client.post("/api/v1/devices", json={
+        "name": "Machine A",
+        "mac": "AA:AA:AA",
+        "machine_type": "CNC",
+        "location": "Shop",
+        "id": 1
+    })
+    assert response.status_code == 200
 
     # Try nonexistent monitor
     response = client.post(
-        "/api/v1/monitors/XX:XX:XX/reassign?machine_name=Machine A")
+        "/api/v1/monitors/999/reassign?machine_name=Machine A")
     assert response.status_code == 404
 
     # Try nonexistent machine
     response = client.post(
-        "/api/v1/monitors/AA:AA:AA/reassign?machine_name=Nonexistent")
+        "/api/v1/monitors/1/reassign?machine_name=Nonexistent")
     assert response.status_code == 404
 
 

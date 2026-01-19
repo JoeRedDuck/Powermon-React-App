@@ -360,7 +360,7 @@ def edit_device(mac: str, device: DeviceUpdate, session: Session = Depends(get_d
             status_code=400,
             detail={
                 "status": "error",
-                "message": "Monitor ID cannot be changed via edit. Use POST /api/v1/monitors/{monitor_mac}/reassign?machine_name=<machine_name> to reassign monitors."
+                "message": "Monitor ID cannot be changed via edit. Use POST /api/v1/monitors/{monitor_id}/reassign?machine_name=<machine_name> to reassign monitors."
             }
         )
 
@@ -370,8 +370,8 @@ def edit_device(mac: str, device: DeviceUpdate, session: Session = Depends(get_d
     raise HTTPException(status_code=404, detail={"status": "not_found"})
 
 
-@app.post("/api/v1/monitors/{monitor_mac}/reassign")
-def reassign_monitor(monitor_mac: str, machine_name: str = Query(...), session: Session = Depends(get_db)):
+@app.post("/api/v1/monitors/{monitor_id}/reassign")
+def reassign_monitor(monitor_id: int, machine_name: str = Query(...), session: Session = Depends(get_db)):
     """
     Reassign a monitor to a different machine.
 
@@ -382,8 +382,8 @@ def reassign_monitor(monitor_mac: str, machine_name: str = Query(...), session: 
     Query params:
         machine_name: The name of the machine to assign the monitor to
     """
-    if db.reassign_monitor(session, monitor_mac, machine_name):
-        return {"status": "reassigned", "monitor_mac": monitor_mac, "machine_name": machine_name}
+    if db.reassign_monitor(session, monitor_id, machine_name):
+        return {"status": "reassigned", "monitor_id": monitor_id, "machine_name": machine_name}
     raise HTTPException(status_code=404, detail={
         "status": "not_found",
         "reason": "Monitor or machine not found"

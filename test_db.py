@@ -180,8 +180,8 @@ def test_delete_device(db_session):
 def test_reassign_monitor(db_session):
     """Test reassigning a monitor from one machine to another."""
     # Create two machines with monitors
-    data1 = MockDeviceData("Machine A", "AA:AA:AA", "Shop", "Type A")
-    data2 = MockDeviceData("Machine B", "BB:BB:BB", "Shop", "Type B")
+    data1 = MockDeviceData("Machine A", "AA:AA:AA", "Shop", "TypeA", id=1)
+    data2 = MockDeviceData("Machine B", "BB:BB:BB", "Shop", "TypeB", id=2)
     db_service.add_device(db_session, data1)
     db_service.add_device(db_session, data2)
 
@@ -194,7 +194,7 @@ def test_reassign_monitor(db_session):
     assert monitor_b.machine_name == "Machine B"
 
     # Reassign Monitor B to Machine A (Monitor A should become orphaned)
-    success = db_service.reassign_monitor(db_session, "BB:BB:BB", "Machine A")
+    success = db_service.reassign_monitor(db_session, 2, "Machine A")
     assert success is True
 
     # Verify reassignment
@@ -214,7 +214,7 @@ def test_reassign_monitor(db_session):
 def test_reassign_monitor_with_polls(db_session):
     """Test that reassigning a monitor doesn't affect poll ownership."""
     # Create machine with monitor
-    data = MockDeviceData("CNC", "CC:CC:CC", "Shop", "CNC")
+    data = MockDeviceData("CNC", "CC:CC:CC", "Shop", "CNC", id=1)
     db_service.add_device(db_session, data)
 
     # Add polls for the machine
@@ -224,11 +224,11 @@ def test_reassign_monitor_with_polls(db_session):
     db_service.insert_poll(db_session, "CC:CC:CC", 1100, now)
 
     # Create a second machine and monitor
-    data2 = MockDeviceData("Mill", "DD:DD:DD", "Shop", "Mill")
+    data2 = MockDeviceData("Mill", "DD:DD:DD", "Shop", "Mill", id=2)
     db_service.add_device(db_session, data2)
 
     # Reassign Monitor CC to Mill machine
-    success = db_service.reassign_monitor(db_session, "CC:CC:CC", "Mill")
+    success = db_service.reassign_monitor(db_session, 1, "Mill")
     assert success is True
 
     # Verify polls still belong to CNC machine (not moved with monitor)
@@ -245,16 +245,16 @@ def test_reassign_monitor_with_polls(db_session):
 
 def test_reassign_monitor_nonexistent(db_session):
     """Test reassigning with nonexistent monitor or machine."""
-    data = MockDeviceData("Machine", "AA:AA:AA", "Shop", "Type")
+    data = MockDeviceData("Machine", "AA:AA:AA", "Shop", "Type", id=1)
     db_service.add_device(db_session, data)
 
     # Try to reassign nonexistent monitor
     assert db_service.reassign_monitor(
-        db_session, "XX:XX:XX", "Machine") is False
+        db_session, 999, "Machine") is False
 
     # Try to reassign to nonexistent machine
     assert db_service.reassign_monitor(
-        db_session, "AA:AA:AA", "Nonexistent") is False
+        db_session, 1, "Nonexistent") is False
 
 
 def test_delete_machine_by_name(db_session):

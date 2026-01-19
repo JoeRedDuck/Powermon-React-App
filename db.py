@@ -126,7 +126,7 @@ def delete_device(db: Session, mac: str) -> bool:
     return False
 
 
-def reassign_monitor(db: Session, monitor_mac: str, new_machine_name: str) -> bool:
+def reassign_monitor(db: Session, monitor_id: int, new_machine_name: str) -> bool:
     """
     Reassign a monitor to a different machine.
 
@@ -137,7 +137,7 @@ def reassign_monitor(db: Session, monitor_mac: str, new_machine_name: str) -> bo
 
     Args:
         db: Database session
-        monitor_mac: MAC address of the monitor to reassign
+        monitor_id: ID of the monitor to reassign
         new_machine_name: Name of the machine to assign the monitor to
 
     Returns:
@@ -145,7 +145,7 @@ def reassign_monitor(db: Session, monitor_mac: str, new_machine_name: str) -> bo
     """
     # Check if monitor exists
     monitor = db.query(models.Monitor).filter(
-        models.Monitor.mac == monitor_mac).first()
+        models.Monitor.id == monitor_id).first()
     if not monitor:
         return False
 
