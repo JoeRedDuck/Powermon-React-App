@@ -186,8 +186,10 @@ def test_reassign_monitor(db_session):
     db_service.add_device(db_session, data2)
 
     # Verify initial setup
-    monitor_a = db_session.query(models.Monitor).filter_by(mac="AA:AA:AA").first()
-    monitor_b = db_session.query(models.Monitor).filter_by(mac="BB:BB:BB").first()
+    monitor_a = db_session.query(
+        models.Monitor).filter_by(mac="AA:AA:AA").first()
+    monitor_b = db_session.query(
+        models.Monitor).filter_by(mac="BB:BB:BB").first()
     assert monitor_a.machine_name == "Machine A"
     assert monitor_b.machine_name == "Machine B"
 
@@ -203,7 +205,8 @@ def test_reassign_monitor(db_session):
 
     # Verify Machine B is now without a monitor
     devices = db_service.get_devices(db_session)
-    machine_b_device = next((d for d in devices if d["name"] == "Machine B"), None)
+    machine_b_device = next(
+        (d for d in devices if d["name"] == "Machine B"), None)
     assert machine_b_device is not None
     assert machine_b_device["mac"] is None  # No monitor assigned
 
@@ -216,7 +219,8 @@ def test_reassign_monitor_with_polls(db_session):
 
     # Add polls for the machine
     now = datetime.now(timezone.utc)
-    db_service.insert_poll(db_session, "CC:CC:CC", 1000, now - timedelta(minutes=5))
+    db_service.insert_poll(db_session, "CC:CC:CC", 1000,
+                           now - timedelta(minutes=5))
     db_service.insert_poll(db_session, "CC:CC:CC", 1100, now)
 
     # Create a second machine and monitor
@@ -228,12 +232,14 @@ def test_reassign_monitor_with_polls(db_session):
     assert success is True
 
     # Verify polls still belong to CNC machine (not moved with monitor)
-    cnc_polls = db_session.query(models.Poll).filter_by(machine_name="CNC").all()
+    cnc_polls = db_session.query(
+        models.Poll).filter_by(machine_name="CNC").all()
     assert len(cnc_polls) == 2
     assert all(p.monitor_mac == "CC:CC:CC" for p in cnc_polls)
 
     # Mill should have no polls yet
-    mill_polls = db_session.query(models.Poll).filter_by(machine_name="Mill").all()
+    mill_polls = db_session.query(
+        models.Poll).filter_by(machine_name="Mill").all()
     assert len(mill_polls) == 0
 
 
@@ -243,10 +249,12 @@ def test_reassign_monitor_nonexistent(db_session):
     db_service.add_device(db_session, data)
 
     # Try to reassign nonexistent monitor
-    assert db_service.reassign_monitor(db_session, "XX:XX:XX", "Machine") is False
+    assert db_service.reassign_monitor(
+        db_session, "XX:XX:XX", "Machine") is False
 
     # Try to reassign to nonexistent machine
-    assert db_service.reassign_monitor(db_session, "AA:AA:AA", "Nonexistent") is False
+    assert db_service.reassign_monitor(
+        db_session, "AA:AA:AA", "Nonexistent") is False
 
 
 def test_delete_machine_by_name(db_session):

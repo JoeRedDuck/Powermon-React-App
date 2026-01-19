@@ -129,17 +129,17 @@ def delete_device(db: Session, mac: str) -> bool:
 def reassign_monitor(db: Session, monitor_mac: str, new_machine_name: str) -> bool:
     """
     Reassign a monitor to a different machine.
-    
+
     - The monitor is updated to point to the new machine
     - The old monitor (if any) on the source machine remains orphaned (machine_name = None)
     - If the monitor was on another machine, that machine is left without a monitor
     - Polls remain associated with machine_name (they don't move with the monitor)
-    
+
     Args:
         db: Database session
         monitor_mac: MAC address of the monitor to reassign
         new_machine_name: Name of the machine to assign the monitor to
-        
+
     Returns:
         True if successful, False if monitor or machine not found
     """
@@ -148,22 +148,22 @@ def reassign_monitor(db: Session, monitor_mac: str, new_machine_name: str) -> bo
         models.Monitor.mac == monitor_mac).first()
     if not monitor:
         return False
-    
+
     # Check if target machine exists
     machine = db.query(models.Machine).filter(
         models.Machine.name == new_machine_name).first()
     if not machine:
         return False
-    
+
     # If the target machine already has a monitor, orphan it (set machine_name to None)
     existing_monitor = db.query(models.Monitor).filter(
         models.Monitor.machine_name == new_machine_name).first()
     if existing_monitor:
         existing_monitor.machine_name = None
-    
+
     # Reassign the monitor to the new machine
     monitor.machine_name = new_machine_name
-    
+
     db.commit()
     return True
 
@@ -174,7 +174,7 @@ def update_device(db: Session, mac: str, device_data) -> bool:
     if not monitor:
         return False
 
-    monitor.id = device_data.id
+    # Don't update monitor.id here - use reassign_monitor() for monitor reassignment
 
     # Update machine info linked to this monitor
     machine = db.query(models.Machine).filter(
