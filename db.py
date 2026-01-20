@@ -187,10 +187,10 @@ def update_device(db: Session, mac: str, device_data) -> bool:
         models.Machine.name == monitor.machine_name).first()
     if not machine:
         return False
-    
+
     old_name = machine.name
     new_name = device_data.name
-    
+
     # If name is changing, check for duplicates and cascade updates
     if new_name != old_name:
         # Check if new name already exists
@@ -199,24 +199,25 @@ def update_device(db: Session, mac: str, device_data) -> bool:
         if existing_machine:
             # Duplicate name - don't allow
             return False
-        
-        # Update all polls that reference the old machine name
-        db.query(models.Poll).filter(
-            models.Poll.machine_name == old_name
-        ).update({"machine_name": new_name})
-        
-        # Update the monitor's machine_name reference
-        monitor.machine_name = new_name
-        
+
+        # ORDER MATTERS: Update machine name FIRST (so FK constraint is satisfied)
         # Update the machine name (primary key)
         machine.name = new_name
-    
+        
+        # Now update the monitor's machine_name reference
+        monitor.machine_name = new_name
+        
+        # Finally update all polls that reference the old machine name
+        db.query(models.Poll).filter(
+            models.Poll.machine_name == old_name
+        ).update({"machine_name": new_name}, synchronize_session=False)
+
     # Update other machine fields
     if device_data.machine_type:
         machine.type = device_data.machine_type
     if device_data.location:
         machine.location = device_data.location
-    
+
     db.commit()
     return True
 

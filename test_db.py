@@ -150,41 +150,48 @@ def test_update_machine_name(db_session):
     # Create device with polls
     data = MockDeviceData("Old Name", "AA:BB:CC", "Shop", "CNC", id=1)
     db_service.add_device(db_session, data)
-    
+
     # Add polls for the machine
     now = datetime.now(timezone.utc)
-    db_service.insert_poll(db_session, "AA:BB:CC", 100, now - timedelta(minutes=5))
+    db_service.insert_poll(db_session, "AA:BB:CC", 100,
+                           now - timedelta(minutes=5))
     db_service.insert_poll(db_session, "AA:BB:CC", 200, now)
-    
+
     # Verify initial state
-    polls = db_session.query(models.Poll).filter_by(machine_name="Old Name").all()
+    polls = db_session.query(models.Poll).filter_by(
+        machine_name="Old Name").all()
     assert len(polls) == 2
-    
+
     # Update machine name
     update_data = MockDeviceData("New Name", "AA:BB:CC", "Shop", "CNC", id=1)
     success = db_service.update_device(db_session, "AA:BB:CC", update_data)
     assert success is True
-    
+
     # Verify machine was renamed
-    machine = db_session.query(models.Machine).filter_by(name="New Name").first()
+    machine = db_session.query(models.Machine).filter_by(
+        name="New Name").first()
     assert machine is not None
     assert machine.name == "New Name"
-    
+
     # Verify old name doesn't exist
-    old_machine = db_session.query(models.Machine).filter_by(name="Old Name").first()
+    old_machine = db_session.query(
+        models.Machine).filter_by(name="Old Name").first()
     assert old_machine is None
-    
+
     # Verify all polls were updated with new machine name
-    old_polls = db_session.query(models.Poll).filter_by(machine_name="Old Name").all()
+    old_polls = db_session.query(models.Poll).filter_by(
+        machine_name="Old Name").all()
     assert len(old_polls) == 0
-    
-    new_polls = db_session.query(models.Poll).filter_by(machine_name="New Name").all()
+
+    new_polls = db_session.query(models.Poll).filter_by(
+        machine_name="New Name").all()
     assert len(new_polls) == 2
-    
+
     # Verify monitor reference was updated
-    monitor = db_session.query(models.Monitor).filter_by(mac="AA:BB:CC").first()
+    monitor = db_session.query(
+        models.Monitor).filter_by(mac="AA:BB:CC").first()
     assert monitor.machine_name == "New Name"
-    
+
     # Verify device can be retrieved by new name
     d = db_service.get_device_by_name(db_session, "New Name")
     assert d is not None
@@ -197,14 +204,15 @@ def test_update_machine_name_duplicate(db_session):
     data2 = MockDeviceData("Machine 2", "BB:BB:BB", "Shop", "Mill", id=2)
     db_service.add_device(db_session, data1)
     db_service.add_device(db_session, data2)
-    
+
     # Try to rename Machine 1 to Machine 2 (duplicate)
     update_data = MockDeviceData("Machine 2", "AA:AA:AA", "Shop", "CNC", id=1)
     success = db_service.update_device(db_session, "AA:AA:AA", update_data)
     assert success is False
-    
+
     # Verify Machine 1 still has original name
-    machine1 = db_session.query(models.Machine).filter_by(name="Machine 1").first()
+    machine1 = db_session.query(models.Machine).filter_by(
+        name="Machine 1").first()
     assert machine1 is not None
 
 
