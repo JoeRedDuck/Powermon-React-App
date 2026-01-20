@@ -200,14 +200,29 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             # Duplicate name - don't allow
             return False
 
-        # CRITICAL: The FK constraint on monitor has NO ON UPDATE CASCADE.
-        # We must defer FK constraint checking until the end of the transaction,
-        # so we can update machine PK first, then monitor FK, without constraint violations.
+        # CRITICAL: The FK constraint on monitor is NOT DEFERRABLE by default.
+        # We must temporarily make it deferrable, or disable triggers during the update.
         
-        # Defer FK constraint checking for this transaction (PostgreSQL only)
-        # SQLite doesn't support this, but SQLite also doesn't enforce FK constraints immediately by default
         if db.bind.dialect.name == 'postgresql':
-            db.execute(text("SET CONSTRAINTS ALL DEFERRED"))
+            # Make the FK constraint deferrable if it isn't already
+            db.execute(text("""
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conname = 'monitor_machine_name_fkey' 
+                        AND condeferrable = true
+                    ) THEN
+                        ALTER TABLE monitor DROP CONSTRAINT IF EXISTS monitor_machine_name_fkey;
+                        ALTER TABLE monitor ADD CONSTRAINT monitor_machine_name_fkey 
+                            FOREIGN KEY (machine_name) REFERENCES machine(machine_name) 
+                            DEFERRABLE INITIALLY DEFERRED;
+                    END IF;
+                END $$;
+            """))
+            
+            # Now defer the constraint for this transaction
+            db.execute(text("SET CONSTRAINTS monitor_machine_name_fkey DEFERRED"))
         
         # 1. Update the machine's primary key using raw SQL
         db.execute(
