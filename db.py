@@ -200,15 +200,18 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             # Duplicate name - don't allow
             return False
 
-        # ORDER MATTERS: Update machine name FIRST (so FK constraint is satisfied)
-        # Update the machine name (primary key)
-        machine.name = new_name
+        # ORDER MATTERS: Update FK references BEFORE changing the primary key
+        # First update the monitor's machine_name reference (FK)
+        monitor.machine_name = new_name
         
-        # CRITICAL: Flush to database immediately to satisfy FK constraint before updating polls
+        # CRITICAL: Flush to database immediately so FK points to new name
         db.flush()
 
-        # Now update the monitor's machine_name reference
-        monitor.machine_name = new_name
+        # Now update the machine name (primary key) - safe because FK already updated
+        machine.name = new_name
+        
+        # Flush again to ensure machine name change is written
+        db.flush()
 
         # Finally update all polls that reference the old machine name
         db.query(models.Poll).filter(
