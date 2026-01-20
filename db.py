@@ -204,9 +204,12 @@ def update_device(db: Session, mac: str, device_data) -> bool:
         # Update the machine name (primary key)
         machine.name = new_name
         
+        # CRITICAL: Flush to database immediately to satisfy FK constraint before updating polls
+        db.flush()
+
         # Now update the monitor's machine_name reference
         monitor.machine_name = new_name
-        
+
         # Finally update all polls that reference the old machine name
         db.query(models.Poll).filter(
             models.Poll.machine_name == old_name
