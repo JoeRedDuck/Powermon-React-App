@@ -317,6 +317,16 @@ def get_device_detail(mac: str, session: Session = Depends(get_db)):
     return d
 
 
+@app.get("/api/v1/machines/{machine_name}")
+def get_device_by_name(machine_name: str, session: Session = Depends(get_db)):
+    """Get device information by machine name."""
+    d = db.get_device_by_name(session, machine_name)
+    if not d:
+        raise HTTPException(status_code=404, detail={"status": "not_found"})
+    d["status"] = get_device_status(d)
+    return d
+
+
 @app.get("/api/v1/locations")
 def list_locations(session: Session = Depends(
     get_db)): return db.get_locations(session)

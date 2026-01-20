@@ -103,6 +103,27 @@ def test_get_device_by_mac(client):
     assert "status" in device
 
 
+def test_get_device_by_name(client):
+    """Test getting a single device by machine name."""
+    name = "Drill Press XL"
+    mac = "BB:CC:DD"
+    create_res = create_dummy_device(client, mac=mac, name=name, location="Shop")
+    assert create_res.status_code == 200
+
+    # Get device by name
+    response = client.get(f"/api/v1/machines/{name}")
+    assert response.status_code == 200
+
+    device = response.json()
+    assert device["name"] == name
+    assert device["mac"] == mac
+    assert "status" in device
+
+    # Test nonexistent device
+    response = client.get("/api/v1/machines/Nonexistent Machine")
+    assert response.status_code == 404
+
+
 def test_update_device(client):
     """Test updating device information."""
     mac = "CC:DD:EE"

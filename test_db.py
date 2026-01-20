@@ -124,6 +124,27 @@ def test_update_device_location(db_session):
     assert d['location'] == "New Location"
 
 
+def test_get_device_by_name(db_session):
+    """Test getting a device by machine name."""
+    data1 = MockDeviceData("Lathe 1", "AA:BB:CC", "Shop", "Lathe", id=1)
+    data2 = MockDeviceData("Mill 2", "DD:EE:FF", "Warehouse", "Mill", id=2)
+    db_service.add_device(db_session, data1)
+    db_service.add_device(db_session, data2)
+
+    # Get by name
+    d = db_service.get_device_by_name(db_session, "Lathe 1")
+    assert d is not None
+    assert d["name"] == "Lathe 1"
+    assert d["mac"] == "AA:BB:CC"
+    assert d["location"] == "Shop"
+    assert d["machine_type"] == "Lathe"
+    assert d["id"] == 1
+
+    # Get nonexistent device
+    d = db_service.get_device_by_name(db_session, "Nonexistent")
+    assert d is None
+
+
 def test_reassign_monitor_to_new_machine(db_session):
     """Test reassigning a monitor to a new machine."""
     # 1. Setup Monitor attached to "Machine A"

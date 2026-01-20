@@ -68,6 +68,12 @@ def get_device(db: Session, mac: str) -> Optional[Dict[str, Any]]:
     return next((d for d in devices if d["mac"] == mac), None)
 
 
+def get_device_by_name(db: Session, machine_name: str) -> Optional[Dict[str, Any]]:
+    """Get device information by machine name."""
+    devices = get_devices(db)
+    return next((d for d in devices if d["name"] == machine_name), None)
+
+
 def get_locations(db: Session) -> List[str]:
     return [r[0] for r in db.query(models.Machine.location).distinct().filter(models.Machine.location.isnot(None)).all()]
 
