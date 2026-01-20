@@ -185,11 +185,38 @@ def update_device(db: Session, mac: str, device_data) -> bool:
     # Update machine info linked to this monitor
     machine = db.query(models.Machine).filter(
         models.Machine.name == monitor.machine_name).first()
-    if machine:
-        if device_data.machine_type:
-            machine.type = device_data.machine_type
-        if device_data.location:
-            machine.location = device_data.location
+    if not machine:
+        return False
+    
+    old_name = machine.name
+    new_name = device_data.name
+    
+    # If name is changing, check for duplicates and cascade updates
+    if new_name != old_name:
+        # Check if new name already exists
+        existing_machine = db.query(models.Machine).filter(
+            models.Machine.name == new_name).first()
+        if existing_machine:
+            # Duplicate name - don't allow
+            return False
+        
+        # Update all polls that reference the old machine name
+        db.query(models.Poll).filter(
+            models.Poll.machine_name == old_name
+        ).update({"machine_name": new_name})
+        
+        # Update the monitor's machine_name reference
+        monitor.machine_name = new_name
+        
+        # Update the machine name (primary key)
+        machine.name = new_name
+    
+    # Update other machine fields
+    if device_data.machine_type:
+        machine.type = device_data.machine_type
+    if device_data.location:
+        machine.location = device_data.location
+    
     db.commit()
     return True
 
