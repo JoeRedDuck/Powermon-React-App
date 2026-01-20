@@ -201,22 +201,27 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             return False
 
         # CRITICAL: The FK constraint on monitor has NO ON UPDATE CASCADE.
-        # We must update the monitor FK FIRST using raw SQL, then update the machine PK.
-        # SQLAlchemy ORM doesn't guarantee the update order, so use raw SQL.
+        # We must defer FK constraint checking until the end of the transaction,
+        # so we can update machine PK first, then monitor FK, without constraint violations.
         
-        # 1. Update monitor's FK reference using raw SQL (executes immediately)
-        db.execute(
-            text("UPDATE monitor SET machine_name = :new_name WHERE machine_name = :old_name"),
-            {"new_name": new_name, "old_name": old_name}
-        )
+        # Defer FK constraint checking for this transaction (PostgreSQL only)
+        # SQLite doesn't support this, but SQLite also doesn't enforce FK constraints immediately by default
+        if db.bind.dialect.name == 'postgresql':
+            db.execute(text("SET CONSTRAINTS ALL DEFERRED"))
         
-        # 2. Update the machine's primary key using raw SQL (executes immediately)
+        # 1. Update the machine's primary key using raw SQL
         db.execute(
             text("UPDATE machine SET machine_name = :new_name WHERE machine_name = :old_name"),
             {"new_name": new_name, "old_name": old_name}
         )
+        
+        # 2. Update monitor's FK reference using raw SQL
+        db.execute(
+            text("UPDATE monitor SET machine_name = :new_name WHERE machine_name = :old_name"),
+            {"new_name": new_name, "old_name": old_name}
+        )
 
-        # 3. Update all polls using raw SQL (executes immediately)
+        # 3. Update all polls using raw SQL
         db.execute(
             text("UPDATE poll SET machine_name = :new_name WHERE machine_name = :old_name"),
             {"new_name": new_name, "old_name": old_name}
