@@ -200,29 +200,12 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             # Duplicate name - don't allow
             return False
 
-        # CRITICAL: The FK constraint on monitor is NOT DEFERRABLE by default.
-        # We must temporarily make it deferrable, or disable triggers during the update.
+        # CRITICAL: The FK constraint on monitor is NOT DEFERRABLE and ALTER TABLE causes locks.
+        # Solution: Temporarily drop the constraint, do updates, recreate it.
         
         if db.bind.dialect.name == 'postgresql':
-            # Make the FK constraint deferrable if it isn't already
-            db.execute(text("""
-                DO $$ 
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM pg_constraint 
-                        WHERE conname = 'monitor_machine_name_fkey' 
-                        AND condeferrable = true
-                    ) THEN
-                        ALTER TABLE monitor DROP CONSTRAINT IF EXISTS monitor_machine_name_fkey;
-                        ALTER TABLE monitor ADD CONSTRAINT monitor_machine_name_fkey 
-                            FOREIGN KEY (machine_name) REFERENCES machine(machine_name) 
-                            DEFERRABLE INITIALLY DEFERRED;
-                    END IF;
-                END $$;
-            """))
-            
-            # Now defer the constraint for this transaction
-            db.execute(text("SET CONSTRAINTS monitor_machine_name_fkey DEFERRED"))
+            # Drop the FK constraint temporarily
+            db.execute(text("ALTER TABLE monitor DROP CONSTRAINT IF EXISTS monitor_machine_name_fkey"))
         
         # 1. Update the machine's primary key using raw SQL
         db.execute(
@@ -242,6 +225,13 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             {"new_name": new_name, "old_name": old_name}
         )
         
+        if db.bind.dialect.name == 'postgresql':
+            # Recreate the FK constraint
+            db.execute(text("""
+                ALTER TABLE monitor ADD CONSTRAINT monitor_machine_name_fkey 
+                FOREIGN KEY (machine_name) REFERENCES machine(machine_name)
+            """))
+
         # 4. Expunge the old objects from the session to prevent ORM from trying to update them
         db.expunge(machine)
         db.expunge(monitor)
