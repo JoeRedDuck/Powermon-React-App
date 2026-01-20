@@ -200,20 +200,16 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             # Duplicate name - don't allow
             return False
 
-        # ORDER MATTERS: Update FK references BEFORE changing the primary key
-        # First update the monitor's machine_name reference (FK)
-        monitor.machine_name = new_name
+        # CRITICAL: Update all references in a specific order without intermediate flushes
+        # This allows all SQL statements to execute in one transaction where FK checks happen at commit
         
-        # CRITICAL: Flush to database immediately so FK points to new name
-        db.flush()
-
-        # Now update the machine name (primary key) - safe because FK already updated
+        # 1. Update the machine's primary key first
         machine.name = new_name
         
-        # Flush again to ensure machine name change is written
-        db.flush()
+        # 2. Update the monitor's FK reference
+        monitor.machine_name = new_name
 
-        # Finally update all polls that reference the old machine name
+        # 3. Update all polls that reference the old machine name
         db.query(models.Poll).filter(
             models.Poll.machine_name == old_name
         ).update({"machine_name": new_name}, synchronize_session=False)
