@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, aliased  # type: ignore
-from sqlalchemy import func, and_, desc  # type: ignore
+from sqlalchemy import func, and_, desc, text  # type: ignore
 from datetime import datetime
 import models
 from typing import List, Optional, Dict, Any
@@ -200,23 +200,31 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             # Duplicate name - don't allow
             return False
 
-        # CRITICAL: The .update() method executes immediately, but ORM attribute changes
-        # (machine.name = new_name) don't execute until flush/commit. So we MUST flush
-        # the machine and monitor changes BEFORE the bulk poll update.
+        # CRITICAL: The FK constraint on monitor has NO ON UPDATE CASCADE.
+        # We must update the monitor FK FIRST using raw SQL, then update the machine PK.
+        # SQLAlchemy ORM doesn't guarantee the update order, so use raw SQL.
         
-        # 1. Update the machine's primary key first
-        machine.name = new_name
+        # 1. Update monitor's FK reference using raw SQL (executes immediately)
+        db.execute(
+            text("UPDATE monitor SET machine_name = :new_name WHERE machine_name = :old_name"),
+            {"new_name": new_name, "old_name": old_name}
+        )
         
-        # 2. Update the monitor's FK reference
-        monitor.machine_name = new_name
-        
-        # 3. FLUSH these changes to the database NOW
-        db.flush()
+        # 2. Update the machine's primary key using raw SQL (executes immediately)
+        db.execute(
+            text("UPDATE machine SET machine_name = :new_name WHERE machine_name = :old_name"),
+            {"new_name": new_name, "old_name": old_name}
+        )
 
-        # 4. Now update all polls - this executes immediately and 'new_name' exists in DB
-        db.query(models.Poll).filter(
-            models.Poll.machine_name == old_name
-        ).update({"machine_name": new_name}, synchronize_session=False)
+        # 3. Update all polls using raw SQL (executes immediately)
+        db.execute(
+            text("UPDATE poll SET machine_name = :new_name WHERE machine_name = :old_name"),
+            {"new_name": new_name, "old_name": old_name}
+        )
+        
+        # 4. Expunge the old objects from the session to prevent ORM from trying to update them
+        db.expunge(machine)
+        db.expunge(monitor)
 
     # Update other machine fields
     if device_data.machine_type:
