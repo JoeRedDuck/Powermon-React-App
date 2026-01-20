@@ -1,3 +1,6 @@
+from database import SessionLocal, get_db
+import models
+import db
 import asyncio
 import os
 import subprocess
@@ -8,6 +11,7 @@ import shutil
 import requests
 import json
 import argparse
+import warnings
 from dateutil import parser
 from dotenv import load_dotenv  # type: ignore
 from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
@@ -16,9 +20,9 @@ from pydantic import BaseModel, validator  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from sqlalchemy import text  # type: ignore
 
-import db
-import models
-from database import SessionLocal, get_db
+# Suppress SSL certificate database warning from requests/urllib3
+warnings.filterwarnings('ignore', message='.*certificate.*')
+
 
 # --- Config ---
 load_dotenv()

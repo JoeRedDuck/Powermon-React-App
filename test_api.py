@@ -323,10 +323,12 @@ def test_monitors_list(client):
     response = client.get("/api/v1/monitors")
     assert response.status_code == 200
     monitors = response.json()
-    
+
     assert len(monitors) == 2
-    assert any(m["id"] == 1 and m["mac"] == "AA:AA:AA" and m["name"] == "Machine A" for m in monitors)
-    assert any(m["id"] == 2 and m["mac"] == "BB:BB:BB" and m["name"] == "Machine B" for m in monitors)
+    assert any(m["id"] == 1 and m["mac"] == "AA:AA:AA" and m["name"]
+               == "Machine A" for m in monitors)
+    assert any(m["id"] == 2 and m["mac"] == "BB:BB:BB" and m["name"]
+               == "Machine B" for m in monitors)
 
 
 def test_device_stats(client):
