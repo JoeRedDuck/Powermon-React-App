@@ -337,6 +337,12 @@ def list_types(session: Session = Depends(get_db)
                ): return db.get_machine_types(session)
 
 
+@app.get("/api/v1/monitors")
+def list_monitors(session: Session = Depends(get_db)):
+    """Get all monitors with their IDs, MAC addresses, and assignment status."""
+    return db.get_monitors(session)
+
+
 @app.get("/api/v1/device_stats")
 def get_stats(session: Session = Depends(get_db)):
     devs = get_status(session=session)

@@ -107,7 +107,8 @@ def test_get_device_by_name(client):
     """Test getting a single device by machine name."""
     name = "Drill Press XL"
     mac = "BB:CC:DD"
-    create_res = create_dummy_device(client, mac=mac, name=name, location="Shop")
+    create_res = create_dummy_device(
+        client, mac=mac, name=name, location="Shop")
     assert create_res.status_code == 200
 
     # Get device by name
@@ -299,6 +300,33 @@ def test_machine_types_list(client):
     assert len(types) == 2
     assert "CNC" in types
     assert "Lathe" in types
+
+
+def test_monitors_list(client):
+    """Test listing all monitors."""
+    # Create devices with specific IDs
+    client.post("/api/v1/devices", json={
+        "name": "Machine A",
+        "mac": "AA:AA:AA",
+        "machine_type": "CNC",
+        "location": "Shop",
+        "id": 1
+    })
+    client.post("/api/v1/devices", json={
+        "name": "Machine B",
+        "mac": "BB:BB:BB",
+        "machine_type": "Mill",
+        "location": "Shop",
+        "id": 2
+    })
+
+    response = client.get("/api/v1/monitors")
+    assert response.status_code == 200
+    monitors = response.json()
+    
+    assert len(monitors) == 2
+    assert any(m["id"] == 1 and m["mac"] == "AA:AA:AA" and m["name"] == "Machine A" for m in monitors)
+    assert any(m["id"] == 2 and m["mac"] == "BB:BB:BB" and m["name"] == "Machine B" for m in monitors)
 
 
 def test_device_stats(client):
