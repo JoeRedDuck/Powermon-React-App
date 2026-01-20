@@ -200,16 +200,20 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             # Duplicate name - don't allow
             return False
 
-        # CRITICAL: Update all references in a specific order without intermediate flushes
-        # This allows all SQL statements to execute in one transaction where FK checks happen at commit
+        # CRITICAL: The .update() method executes immediately, but ORM attribute changes
+        # (machine.name = new_name) don't execute until flush/commit. So we MUST flush
+        # the machine and monitor changes BEFORE the bulk poll update.
         
         # 1. Update the machine's primary key first
         machine.name = new_name
         
         # 2. Update the monitor's FK reference
         monitor.machine_name = new_name
+        
+        # 3. FLUSH these changes to the database NOW
+        db.flush()
 
-        # 3. Update all polls that reference the old machine name
+        # 4. Now update all polls - this executes immediately and 'new_name' exists in DB
         db.query(models.Poll).filter(
             models.Poll.machine_name == old_name
         ).update({"machine_name": new_name}, synchronize_session=False)
