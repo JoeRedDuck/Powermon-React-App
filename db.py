@@ -200,12 +200,13 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             # Duplicate name - don't allow
             return False
 
-        # CRITICAL: The FK constraint on monitor is NOT DEFERRABLE and ALTER TABLE causes locks.
-        # Solution: Temporarily drop the constraint, do updates, recreate it.
+        # CRITICAL: Both monitor AND poll tables have FK constraints on machine_name.
+        # We must drop BOTH constraints, update all tables, then recreate constraints.
         
         if db.bind.dialect.name == 'postgresql':
-            # Drop the FK constraint temporarily
+            # Drop BOTH FK constraints temporarily
             db.execute(text("ALTER TABLE monitor DROP CONSTRAINT IF EXISTS monitor_machine_name_fkey"))
+            db.execute(text("ALTER TABLE poll DROP CONSTRAINT IF EXISTS poll_machine_name_fkey"))
         
         # 1. Update the machine's primary key using raw SQL
         db.execute(
@@ -226,10 +227,14 @@ def update_device(db: Session, mac: str, device_data) -> bool:
         )
         
         if db.bind.dialect.name == 'postgresql':
-            # Recreate the FK constraint
+            # Recreate BOTH FK constraints
             db.execute(text("""
                 ALTER TABLE monitor ADD CONSTRAINT monitor_machine_name_fkey 
                 FOREIGN KEY (machine_name) REFERENCES machine(machine_name)
+            """))
+            db.execute(text("""
+                ALTER TABLE poll ADD CONSTRAINT poll_machine_name_fkey 
+                FOREIGN KEY (machine_name) REFERENCES machine(machine_name) ON DELETE CASCADE
             """))
 
         # 4. Expunge the old objects from the session to prevent ORM from trying to update them
