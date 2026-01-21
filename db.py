@@ -201,7 +201,8 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             return False
 
         # CRITICAL: Use different strategies based on whether FK constraints are DEFERRABLE
-        
+        deferrable_count = 0  # Default for non-PostgreSQL databases
+
         if db.bind.dialect.name == 'postgresql':
             # Check if constraints are deferrable
             result = db.execute(text("""
@@ -210,25 +211,30 @@ def update_device(db: Session, mac: str, device_data) -> bool:
                 AND condeferrable = true
             """))
             deferrable_count = result.scalar()
-            
+
             if deferrable_count == 2:
                 # Constraints are DEFERRABLE - use SET CONSTRAINTS (no locks!)
-                db.execute(text("SET CONSTRAINTS monitor_machine_name_fkey, poll_machine_name_fkey DEFERRED"))
+                db.execute(text(
+                    "SET CONSTRAINTS monitor_machine_name_fkey, poll_machine_name_fkey DEFERRED"))
             else:
                 # Constraints NOT deferrable - use lock with 2 second timeout
                 db.execute(text("SET LOCAL lock_timeout = '2s'"))
-                db.execute(text("ALTER TABLE monitor DROP CONSTRAINT IF EXISTS monitor_machine_name_fkey"))
-                db.execute(text("ALTER TABLE poll DROP CONSTRAINT IF EXISTS poll_machine_name_fkey"))
-        
+                db.execute(
+                    text("ALTER TABLE monitor DROP CONSTRAINT IF EXISTS monitor_machine_name_fkey"))
+                db.execute(
+                    text("ALTER TABLE poll DROP CONSTRAINT IF EXISTS poll_machine_name_fkey"))
+
         # 1. Update the machine's primary key using raw SQL
         db.execute(
-            text("UPDATE machine SET machine_name = :new_name WHERE machine_name = :old_name"),
+            text(
+                "UPDATE machine SET machine_name = :new_name WHERE machine_name = :old_name"),
             {"new_name": new_name, "old_name": old_name}
         )
-        
+
         # 2. Update monitor's FK reference using raw SQL
         db.execute(
-            text("UPDATE monitor SET machine_name = :new_name WHERE machine_name = :old_name"),
+            text(
+                "UPDATE monitor SET machine_name = :new_name WHERE machine_name = :old_name"),
             {"new_name": new_name, "old_name": old_name}
         )
 
@@ -237,7 +243,7 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             text("UPDATE poll SET machine_name = :new_name WHERE machine_name = :old_name"),
             {"new_name": new_name, "old_name": old_name}
         )
-        
+
         if db.bind.dialect.name == 'postgresql' and deferrable_count != 2:
             # Recreate constraints if we dropped them
             db.execute(text("""
@@ -249,11 +255,21 @@ def update_device(db: Session, mac: str, device_data) -> bool:
                 FOREIGN KEY (machine_name) REFERENCES machine(machine_name) ON DELETE CASCADE
             """))
 
-        # 4. Expunge the old objects from the session to prevent ORM from trying to update them
+        # 4. Expunge the old objects and reload with new name
         db.expunge(machine)
         db.expunge(monitor)
 
-    # Update other machine fields
+        # Reload the machine and monitor with the new name
+        machine = db.query(models.Machine).filter_by(name=new_name).first()
+        monitor = db.query(models.Monitor).filter_by(
+            mac=device_data.mac).first()
+
+        # Verify reload was successful
+        if not machine or not monitor:
+            db.rollback()
+            return False
+
+    # Update other machine fields (now safe to update after reload)
     if device_data.machine_type:
         machine.type = device_data.machine_type
     if device_data.location:
@@ -268,14 +284,23 @@ def add_device(db: Session, device_data) -> bool:
     if db.query(models.Monitor).filter(models.Monitor.mac == device_data.mac).first():
         return False
 
-    # 1. Ensure Machine exists in new schema
-    if not db.query(models.Machine).filter(models.Machine.name == device_data.name).first():
-        db.add(models.Machine(
+    # 1. Ensure Machine exists - create or update
+    machine = db.query(models.Machine).filter(models.Machine.name == device_data.name).first()
+    if not machine:
+        # Create new machine
+        machine = models.Machine(
             name=device_data.name,  # Attribute name is 'name', column is 'machine_name'
             type=device_data.machine_type,
             location=device_data.location
-        ))
-        db.flush()
+        )
+        db.add(machine)
+    else:
+        # Update existing machine's type and location
+        machine.type = device_data.machine_type
+        machine.location = device_data.location
+    
+    db.flush()
+    
     # 2. Add Monitor
     db.add(models.Monitor(
         mac=device_data.mac,
