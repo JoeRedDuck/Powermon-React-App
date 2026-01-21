@@ -200,13 +200,25 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             # Duplicate name - don't allow
             return False
 
-        # CRITICAL: Both monitor AND poll tables have FK constraints on machine_name.
-        # We must drop BOTH constraints, update all tables, then recreate constraints.
+        # CRITICAL: Use different strategies based on whether FK constraints are DEFERRABLE
         
         if db.bind.dialect.name == 'postgresql':
-            # Drop BOTH FK constraints temporarily
-            db.execute(text("ALTER TABLE monitor DROP CONSTRAINT IF EXISTS monitor_machine_name_fkey"))
-            db.execute(text("ALTER TABLE poll DROP CONSTRAINT IF EXISTS poll_machine_name_fkey"))
+            # Check if constraints are deferrable
+            result = db.execute(text("""
+                SELECT COUNT(*) FROM pg_constraint 
+                WHERE conname IN ('monitor_machine_name_fkey', 'poll_machine_name_fkey')
+                AND condeferrable = true
+            """))
+            deferrable_count = result.scalar()
+            
+            if deferrable_count == 2:
+                # Constraints are DEFERRABLE - use SET CONSTRAINTS (no locks!)
+                db.execute(text("SET CONSTRAINTS monitor_machine_name_fkey, poll_machine_name_fkey DEFERRED"))
+            else:
+                # Constraints NOT deferrable - use lock with 2 second timeout
+                db.execute(text("SET LOCAL lock_timeout = '2s'"))
+                db.execute(text("ALTER TABLE monitor DROP CONSTRAINT IF EXISTS monitor_machine_name_fkey"))
+                db.execute(text("ALTER TABLE poll DROP CONSTRAINT IF EXISTS poll_machine_name_fkey"))
         
         # 1. Update the machine's primary key using raw SQL
         db.execute(
@@ -226,8 +238,8 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             {"new_name": new_name, "old_name": old_name}
         )
         
-        if db.bind.dialect.name == 'postgresql':
-            # Recreate BOTH FK constraints
+        if db.bind.dialect.name == 'postgresql' and deferrable_count != 2:
+            # Recreate constraints if we dropped them
             db.execute(text("""
                 ALTER TABLE monitor ADD CONSTRAINT monitor_machine_name_fkey 
                 FOREIGN KEY (machine_name) REFERENCES machine(machine_name)
