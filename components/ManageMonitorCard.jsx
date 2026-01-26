@@ -1,5 +1,4 @@
 import Constants from "expo-constants";
-import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -12,19 +11,10 @@ export default function ManageMonitorCard({monitor, onDelete}) {
     '';
   const base = `${apiBase.replace(/\/$/, '')}/api/v1`;
 
-  // Handle edit - navigate to edit screen (to be implemented)
+  // Handle edit - navigate to edit screen
   async function handleEdit() {
     if (busy) return;
-    
-    // Option 1: Navigate to a dedicated edit monitor screen
-    // router.push({ pathname: "/editMonitor", params: { monitorId: monitor.id } });
-    
-    // Option 2: Show a simple alert for now with instructions
-    Alert.alert(
-      "Edit Monitor",
-      `To edit monitor ${monitor.id}, you need to:\n\n1. Create an edit screen at /app/editMonitor.jsx\n2. Load available machines\n3. Allow reassignment via POST /api/v1/monitors/${monitor.id}/reassign?machine_name=<name>`,
-      [{ text: "OK" }]
-    );
+    router.push({ pathname: "/editMonitor", params: { monitorId: monitor.id } });
   }
 
   // Handle remove/delete
