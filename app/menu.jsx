@@ -6,16 +6,18 @@ import RightIcon from "../assets/icons/chevron-right.svg";
 export default function Menu () {
   return (
     <View style={styles.page_container}>
-      <TouchableOpacity onPress={() => router.push({pathname: "/manageMonitors"})}>
+      <TouchableOpacity onPress={() => router.push({pathname: "/addMonitor"})}>
         <View style={styles.settings_container}>
           <Text style={styles.optionText}>Add New Monitor</Text>
           <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
         </View>
       </TouchableOpacity>
-      <View style={styles.settings_container}>
-        <Text style={styles.optionText}>Manage Monitors</Text>
-        <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
-      </View>
+      <TouchableOpacity onPress={() => router.push({pathname: "/manageMonitors"})}>
+        <View style={styles.settings_container}>
+          <Text style={styles.optionText}>Manage Monitors</Text>
+          <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
+        </View>
+      </TouchableOpacity>
     </View>
   )
 }
