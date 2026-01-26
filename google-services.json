@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "955689422250",
+    "project_id": "powermon-8fa30",
+    "storage_bucket": "powermon-8fa30.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:955689422250:android:4d3b7911479d91c72a6fd3",
+        "android_client_info": {
+          "package_name": "com.prozomix.powermon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzxjH3D3bYLIdLw_DsfKGgVEACRbhlePI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

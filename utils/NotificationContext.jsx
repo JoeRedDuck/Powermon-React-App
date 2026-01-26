@@ -1,8 +1,11 @@
 // app/NotificationContext.jsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
+import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { Platform } from "react-native";
 
 const STORAGE_KEY = "powermon_notifications_v1";
 const NotificationContext = createContext(null);
@@ -13,6 +16,51 @@ export function useNotifications() {
 
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    registerForPushNotificationsAsync().then(async token => {
+      if (token) {
+        console.log("EXPO PUSH TOKEN:", token);
+        
+        // Register token with your API
+        const apiBase =
+          process.env.EXPO_PUBLIC_API_BASE ||
+          Constants.expoConfig?.extra?.apiBase ||
+          "";
+        const base = `${apiBase.replace(/\/$/, "")}/api/v1`;
+        
+        try {
+          const deviceName = Constants.deviceName || Device.modelName || "Unknown Device";
+          const url = `${base}/notifications/register`;
+          
+          console.log("Registering token at:", url);
+          console.log("Device name:", deviceName);
+          
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              token: token,
+              device_name: deviceName,
+            }),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log("Token registered:", data.status);
+          } else {
+            const errorText = await response.text();
+            console.error("Failed to register token:", response.status);
+            console.error("Response:", errorText);
+          }
+        } catch (error) {
+          console.error("Error registering token:", error);
+        }
+      }
+    });
+  }, [])
 
   // load from AsyncStorage on mount
   useEffect(() => {
@@ -56,17 +104,6 @@ export function NotificationProvider({ children }) {
 
   // Centralised permission + listeners
   useEffect(() => {
-    (async () => {
-      try {
-        const settings = await Notifications.getPermissionsAsync();
-        if (!settings.granted) {
-          await Notifications.requestPermissionsAsync();
-        }
-      } catch (e) {
-        console.warn("Notification permission request failed", e);
-      }
-    })();
-
     const receiveSub = Notifications.addNotificationReceivedListener((notification) => {
       const payload = notification.request.content;
       const newNotification = {
@@ -103,4 +140,33 @@ export function NotificationProvider({ children }) {
   };
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
+}
+
+async function registerForPushNotificationsAsync() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  if (!Device.isDevice) return; // Handle simulator vs real device
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  
+  if (finalStatus !== 'granted') return;
+
+  // Get the token
+  const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  
+  return token;
 }

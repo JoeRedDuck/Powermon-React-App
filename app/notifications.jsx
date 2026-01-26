@@ -12,8 +12,6 @@ export default function NotificationsScreen () {
   return (
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <TouchableOpacity
-            onPress = {() => sendTestNotification()}><Text>SEND THE TEST NOTIFCATION</Text></TouchableOpacity>
           
           {notifications.map((notif) => (
             <NotificationCard key={notif.id} notification={notif} />

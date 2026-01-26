@@ -8,15 +8,17 @@ export default function AddDevice () {
   const [device,setDevice] = useState(null)
   const [mac, setMac] = useState("");
   const [id, setID] = useState("")
+  const [originalId, setOriginalId] = useState("");
   const [name, setName] = useState("");
-  const [ip, setIp] = useState("");
+  // const [ip, setIp] = useState("");
   const [location, setLocation] = useState("");
   const [machineType, setMachineType] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null)
   const [isEdit, setIsEdit] = useState(false);
-  const { mac: macParam } = useLocalSearchParams();
+  const { mac: macParam } = useLocalSearchParams();  // Actually receives machine name for editing
   const [machineTypes, setMachineTypes] = useState([])
+  const [availableMonitors, setAvailableMonitors] = useState([])
   const apiBase =
       process.env.EXPO_PUBLIC_API_BASE ||
       Constants.expoConfig?.extra?.apiBase ||
@@ -27,18 +29,18 @@ export default function AddDevice () {
   setMac("");
   setName("");
   setID("")
-  setIp("");
+  // setIp("");
   setLocation("");
   setMachineType("");
   }
 
-  const fetchDevice = async (macToGet) => {
-    const url = `${base}/devices/${macToGet}`;
+  const fetchDevice = async (machineNameToGet) => {
+    const url = `${base}/machines/${encodeURIComponent(machineNameToGet)}`;
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setDevice(data[0] || data);
+      setDevice(data);
     } catch (err) {
       console.error("fetchDevice failed", err);
       setDevice(null);
@@ -53,10 +55,26 @@ export default function AddDevice () {
         .catch(() => setMachineTypes([])); // fallback empty
     }, []);
 
+  // Fetch available monitors for assignment
+  useEffect(() => {
+    if (!isEdit || mac) return; // Only fetch if editing and no monitor assigned
+    
+    const url = `${base}/monitors`;
+    fetch(url)
+      .then(r => r.json())
+      .then(monitors => {
+        // Sort monitors by ID
+        const sorted = monitors.sort((a, b) => a.id - b.id);
+        setAvailableMonitors(sorted);
+      })
+      .catch(() => setAvailableMonitors([]));
+  }, [isEdit, mac]);
+
   
   useEffect(() => {
     if (typeof macParam === "string" && macParam.length) {
-      setMac(macParam)
+      // macParam is actually the machine name when editing
+      // Don't set mac state yet - wait for fetchDevice to populate it
       setIsEdit(true)
       fetchDevice(macParam)
     }
@@ -66,8 +84,11 @@ export default function AddDevice () {
     if (!isEdit || !device) return;
     setMac(device.mac || '');
     setName(device.name || '');
-    setID(String(device.id || ''));
-    setIp(device.ip || '');
+    // Handle null/undefined monitor IDs for devices without monitors
+    const deviceId = (device.id !== null && device.id !== undefined) ? String(device.id) : '';
+    setID(deviceId);
+    setOriginalId(deviceId);
+    // setIp(device.ip || '');
     setLocation(device.location || '');
     setMachineType(device.machine_type || '');
   }, [isEdit, device]);
@@ -84,55 +105,124 @@ export default function AddDevice () {
     setBusy(true)
     setError(null)
 
-    const payload = {
-      name: name,
-      id: parseInt(id, 10) || 0,
-      mac: mac,
-      machine_type: machineType,
-      location: location,
-      ip: ip
-    }
-
-    const api_call = isEdit ? `${base}/devices/${mac}` : `${base}/devices`;
-    const method = isEdit ? "PUT" : "POST";
-
     try {
-      
+      // If editing a machine WITHOUT a monitor, only allow monitor assignment
+      if (isEdit && !mac) {
+        if (!id) {
+          Alert.alert("Info", "Please select a monitor to assign to this machine");
+          setBusy(false);
+          return;
+        }
+        
+        // Only call reassign endpoint - no device update needed
+        const reassignRes = await fetch(`${base}/monitors/${id}/reassign?machine_name=${encodeURIComponent(name)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        
+        if (!reassignRes.ok) {
+          let msg;
+          try {
+            const body = await reassignRes.json();
+            msg = body?.detail?.reason || body?.detail || body?.message || body?.error;
+          } catch {
+            msg = await reassignRes.text();
+          }
+          const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
+          Alert.alert("Error", `Monitor assignment failed: ${errorMsg}`);
+          throw new Error(errorMsg || `Reassignment failed (${reassignRes.status})`);
+        }
+        
+        Alert.alert("Success", `Monitor ${id} assigned to ${name}`);
+        router.back();
+        return;
+      }
+
+      // For edit: exclude id from payload, for new device: include it
+      const payload = isEdit ? {
+        name: name,
+        mac: mac,
+        machine_type: machineType,
+        location: location
+      } : {
+        name: name,
+        id: parseInt(id, 10) || 0,
+        mac: mac,
+        machine_type: machineType,
+        location: location
+      };
+
+      const api_call = isEdit ? `${base}/devices/${mac}` : `${base}/devices`;
+      const method = isEdit ? "PUT" : "POST";
+
+      console.log(`Submitting ${method} to ${api_call}`, { payload, mac });
+
       const res = await fetch(api_call, {
         method: method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-    if (!res.ok) {
-      // Try JSON first, fall back to text
-      let msg;
-      try {
-        const body = await res.json();
-        // Prefer a clear message from your API shape
-        msg = body?.detail?.reason || body?.detail || body?.message || body?.error;
-      } catch {
-        msg = await res.text();
+      if (!res.ok) {
+        // Try JSON first, fall back to text
+        let msg;
+        try {
+          const body = await res.json();
+          // Prefer a clear message from your API shape
+          msg = body?.detail?.reason || body?.detail || body?.message || body?.error;
+        } catch {
+          msg = await res.text();
+        }
+        // Ensure msg is a string before passing to Alert
+        const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
+        Alert.alert("Error", errorMsg);
+        throw new Error(errorMsg || `Request failed (${res.status})`);
       }
-      // Ensure msg is a string before passing to Alert
-      const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
-      Alert.alert("Error", errorMsg);
-      throw new Error(errorMsg || `Request failed (${res.status})`);
-    }
 
-    const data = await res.json();
-    setMachineType("");
-  } catch (err) {
-    setError(`${String(err).slice(0, 300)}`);
-  } finally {
-    clearForm()
-    setBusy(false);
-    
-  }
+      const data = await res.json();
+      
+      // If editing and monitor ID changed to a new value (adding or swapping), call reassign endpoint
+      // Don't call if removing monitor (going from value to empty)
+      if (isEdit && id !== originalId && id !== "") {
+        const reassignRes = await fetch(`${base}/monitors/${id}/reassign?machine_name=${encodeURIComponent(name)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        
+        if (!reassignRes.ok) {
+          let msg;
+          try {
+            const body = await reassignRes.json();
+            msg = body?.detail?.reason || body?.detail || body?.message || body?.error;
+          } catch {
+            msg = await reassignRes.text();
+          }
+          const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
+          Alert.alert("Error", `Device updated but reassignment failed: ${errorMsg}`);
+          throw new Error(errorMsg || `Reassignment failed (${reassignRes.status})`);
+        }
+      }
+      
+      // Navigate back to manage devices after successful edit
+      if (isEdit) {
+        router.back();
+      }
+      
+      setMachineType("");
+    } catch (err) {
+      setError(`${String(err).slice(0, 300)}`);
+    } finally {
+      clearForm()
+      setBusy(false);
+      
+    }
   }
 
   return (
+
     <View style={styles.form}>
+
+      
       <View>
         <Text style={styles.label}>Device Name:</Text>
         <TextInput 
@@ -143,31 +233,8 @@ export default function AddDevice () {
           onChangeText={setName}>
         </TextInput>
       </View>
-      <View>
-        <Text style={styles.label}>Monitor ID:</Text>
-        <TextInput 
-          style={styles.input}
-          placeholder="1"
-          placeholderTextColor="#9CA3AF"
-          value={id}
-          onChangeText={setID}
-          keyboardType="numeric">
-        </TextInput>
-      </View>
-      <View>
-        <Text style={styles.label}
-        >Mac Address:</Text>
-        <TextInput 
-          style={styles.input}
-          placeholder="C8:C9:A3:1A:F2:DB"
-          placeholderTextColor="#9CA3AF"
-          value={mac}
-          onChangeText={setMac}
-          editable={!isEdit}
-          selectTextOnFocus={!isEdit}>
-        </TextInput>
-      </View>
-      <View>
+
+    <View>
         <Text style={styles.label}>Machine Type:</Text>
         <View style={styles.pickerWrapper}>
           <Picker
@@ -181,8 +248,8 @@ export default function AddDevice () {
             
           </Picker>
         </View>
-
       </View>
+
       <View>
         <Text style={styles.label}>Location:</Text>
         <TextInput 
@@ -193,7 +260,57 @@ export default function AddDevice () {
           onChangeText={setLocation}>
         </TextInput>
       </View>
+
+
+      {/* Show monitor selector if editing and no monitor assigned, otherwise show Monitor ID field */}
+      {isEdit && !mac ? (
+        <View>
+          <Text style={styles.label}>Select Monitor:</Text>
+          <View style={styles.pickerWrapper}>
+            <Picker
+              style={styles.selector}
+              dropdownIconColor="#111827"
+              selectedValue={id}
+              onValueChange={(v) => setID(v)}>
+              <Picker.Item label="No Monitor (Leave Unassigned)" value="" />
+              {availableMonitors.map((monitor) => (
+                <Picker.Item
+                  key={monitor.id}
+                  label={monitor.machine_name ? `Monitor ${monitor.id} (on ${monitor.machine_name})` : `Monitor ${monitor.id}`}
+                  value={String(monitor.id)}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      ) : (
+        <View>
+          <Text style={styles.label}>Monitor ID:</Text>
+          <TextInput 
+            style={styles.input}
+            placeholder="1"
+            placeholderTextColor="#9CA3AF"
+            value={id}
+            onChangeText={setID}
+            keyboardType="numeric">
+          </TextInput>
+        </View>
+      )}
+
       <View>
+        <Text style={styles.label}>Mac Address:</Text>
+        <TextInput 
+          style={styles.input}
+          placeholder="C8:C9:A3:1A:F2:DB"
+          placeholderTextColor="#9CA3AF"
+          value={mac}
+          onChangeText={setMac}
+          editable={!isEdit}
+          selectTextOnFocus={!isEdit}>
+        </TextInput>
+      </View>
+      
+      {/* <View>
         <Text style={styles.label}>IP Address:</Text>
         <TextInput 
           style={styles.input} 
@@ -202,7 +319,7 @@ export default function AddDevice () {
           value={ip}
           onChangeText={setIp}>
         </TextInput>
-      </View>
+      </View> */}
       <View>
         <TouchableOpacity style={styles.submitButton} onPress={() => handleSubmit()}>
           <Text style={styles.submitText}>{submitButtonText}</Text>

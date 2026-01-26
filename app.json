@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.prozomix.powermon",
+      "googleServicesFile": "google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/icon.png"

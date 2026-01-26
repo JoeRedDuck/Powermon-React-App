@@ -1,64 +1,10 @@
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Platform, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function ManageDeviceCard({ device, onDelete }) {
   const [busy, setBusy] = useState(false)
-
-  const cardStyle = {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E6E9EC",
-    borderWidth: 1,
-    borderRadius: 10,
-    height: 360,
-    width: "100%",
-    flexDirection: "column",
-    paddingVertical: 10,
-    justifyContent: "space-around"
-  }
-
-  const labelStyle = {
-    color: "#6B7280",
-    fontSize: 13,
-    paddingHorizontal: 16
-  }
-
-  const attributeStyle = {
-    fontSize: 19,
-    paddingHorizontal: 16
-  }
-
-  const lineStyle = {
-    height: 0,
-    borderColor: "#E6E9EC", 
-    borderWidth: 0.5
-  }
-
-  const editStyle = {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2563EA",
-    paddingHorizontal: 30,
-    marginTop: 10
-  }
-
-  const removeButtonStyle = {
-    backgroundColor: "#EF4444",
-    borderRadius: 7,
-    height: 40,
-    width: 80,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 3
-
-  }
-
-  const removeTextStyle = {
-    fontSize: 15,
-    color: "#FFFFFF",
-    fontWeight: "bold"
-  }
 
   async function checkPolls(mac) {
      const base =
@@ -122,58 +68,58 @@ export default function ManageDeviceCard({ device, onDelete }) {
 
 
   return (
-    <View style = {{padding: 10, allignItems: "center"}}>
-      <View style = {cardStyle}>
+    <View style={styles.container}>
+      <View style={styles.card}>
 
         <View>
-          <Text style = {labelStyle}>Name</Text>
-          <Text style = {attributeStyle}>{device.name}</Text>
+          <Text style={styles.label}>Name</Text>
+          <Text style={styles.attribute}>{device.name}</Text>
         </View>
 
-        <View style={lineStyle}></View>
+        <View style={styles.line}></View>
 
         <View>
-          <Text style = {labelStyle}>Mac Address</Text>
-          <Text style = {attributeStyle}>{device.mac}</Text>
+          <Text style={styles.label}>Machine Type</Text>
+          <Text style={styles.attribute}>{device.machine_type}</Text>
         </View>
 
-        <View style={lineStyle}></View>
+        <View style={styles.line}></View>
 
         <View>
-          <Text style= {labelStyle}>Monitor ID</Text>
-          <Text style = {attributeStyle}>{device.id}</Text>
+          <Text style={styles.label}>Location</Text>
+          <Text style={styles.attribute}>{device.location}</Text>
         </View>
 
-        <View style={lineStyle}></View>
+        <View style={styles.line}></View>
 
         <View>
-          <Text style = {labelStyle}>Machine Type</Text>
-          <Text style = {attributeStyle}>{device.machine_type}</Text>
+          <Text style={styles.label}>Assigned Monitor ID</Text>
+          <Text style={styles.attribute}>{device.id}</Text>
         </View>
 
-        <View style={lineStyle}></View>
+        <View style={styles.line}></View>
 
         <View>
-          <Text style = {labelStyle}>Location</Text>
-          <Text style = {attributeStyle}>{device.location}</Text>
+          <Text style={styles.label}>Mac Address</Text>
+          <Text style={styles.attribute}>{device.mac}</Text>
         </View>
 
-        <View style={lineStyle}></View>
+        <View style={styles.line}></View>
 
-        <View>
-          <Text style = {labelStyle}>IP Address</Text>
-          <Text style = {attributeStyle}>{device.ip}</Text>
+        {/* <View>
+          <Text style={styles.label}>IP Address</Text>
+          <Text style={styles.attribute}>{device.ip}</Text>
         </View>
 
-        <View style={lineStyle}></View>
+        <View style={styles.line}></View> */}
 
-        <View style={{flexDirection: "row"}}>
-          <TouchableOpacity onPress = {() => router.push({ pathname: "addDevice", params: { mac: device.mac } })}>
-            <Text style={editStyle}>Edit</Text>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity onPress={() => router.push({ pathname: "addDevice", params: { mac: device.name } })}>
+            <Text style={styles.edit}>Edit</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={removeButtonStyle} onPress={() => handleDelete(device.mac)}>
-            <Text style={removeTextStyle}>Remove</Text>
+          <TouchableOpacity style={styles.removeButton} onPress={() => handleDelete(device.mac)}>
+            <Text style={styles.removeText}>Remove</Text>
           </TouchableOpacity>
         </View>
 
@@ -181,3 +127,59 @@ export default function ManageDeviceCard({ device, onDelete }) {
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 10,
+    alignItems: "center"
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E6E9EC",
+    borderWidth: 1,
+    borderRadius: 10,
+    height: 309,
+    width: "100%",
+    flexDirection: "column",
+    paddingVertical: 10,
+    justifyContent: "space-around"
+  },
+  label: {
+    color: "#6B7280",
+    fontSize: 13,
+    paddingHorizontal: 16
+  },
+  attribute: {
+    fontSize: 19,
+    paddingHorizontal: 16
+  },
+  line: {
+    height: 0,
+    borderColor: "#E6E9EC",
+    borderWidth: 0.5
+  },
+  edit: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2563EA",
+    paddingHorizontal: 30,
+    marginTop: 10
+  },
+  removeButton: {
+    backgroundColor: "#EF4444",
+    borderRadius: 7,
+    height: 40,
+    width: 80,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 3
+  },
+  removeText: {
+    fontSize: 15,
+    color: "#FFFFFF",
+    fontWeight: "bold"
+  },
+  buttonContainer: {
+    flexDirection: "row"
+  }
+});

@@ -152,7 +152,8 @@ function Topbar({ filterOpen, setFilterOpen }) {
   const { mac } = useGlobalSearchParams();
   const pathname = usePathname()
 
-  const device = useGetDevice(mac);
+  // Only fetch device by MAC for /device route, not for /addDevice (which uses machine name)
+  const device = useGetDevice(pathname === "/device" ? mac : null);
   const deviceName = pathname === "/device" ? (device?.name || null) : null;
   const titles = {
     "/": "Dashboard",
