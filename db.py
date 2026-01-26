@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session, aliased  # type: ignore
 from sqlalchemy import func, and_, desc, text  # type: ignore
+from sqlalchemy.exc import IntegrityError  # type: ignore
 from datetime import datetime
 import models
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 
 def get_devices(db: Session) -> List[Dict[str, Any]]:
@@ -130,6 +131,59 @@ def delete_device(db: Session, mac: str) -> bool:
         db.commit()
         return True
     return False
+
+
+def unassign_monitor(db: Session, monitor_id: int) -> bool:
+    """
+    Unassign a monitor from its current machine.
+    The monitor remains in the database but is no longer associated with any machine.
+
+    Args:
+        db: Database session
+        monitor_id: ID of the monitor to unassign
+
+    Returns:
+        True if successful, False if monitor not found
+    """
+    monitor = db.query(models.Monitor).filter(
+        models.Monitor.id == monitor_id).first()
+    if not monitor:
+        return False
+
+    monitor.machine_name = None
+    db.commit()
+    return True
+
+
+def delete_monitor(db: Session, monitor_id: int) -> Tuple[bool, Optional[str]]:
+    """
+    Permanently delete a monitor from the database.
+
+    Args:
+        db: Database session
+        monitor_id: ID of the monitor to delete
+
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+        - (True, None) if successful
+        - (False, None) if monitor not found
+        - (False, error_message) if deletion failed due to constraints
+    """
+    monitor = db.query(models.Monitor).filter(
+        models.Monitor.id == monitor_id).first()
+    if not monitor:
+        return (False, None)
+
+    try:
+        db.delete(monitor)
+        db.commit()
+        return (True, None)
+    except IntegrityError as e:
+        db.rollback()
+        # Check if it's a foreign key constraint violation
+        if "foreign key constraint" in str(e).lower() and "poll" in str(e).lower():
+            return (False, "Cannot delete monitor: It has associated poll data. Unassign the monitor instead to keep historical data.")
+        return (False, f"Database constraint violation: {str(e)}")
 
 
 def reassign_monitor(db: Session, monitor_id: int, new_machine_name: str) -> bool:
@@ -285,7 +339,8 @@ def add_device(db: Session, device_data) -> bool:
         return False
 
     # 1. Ensure Machine exists - create or update
-    machine = db.query(models.Machine).filter(models.Machine.name == device_data.name).first()
+    machine = db.query(models.Machine).filter(
+        models.Machine.name == device_data.name).first()
     if not machine:
         # Create new machine
         machine = models.Machine(
@@ -298,9 +353,9 @@ def add_device(db: Session, device_data) -> bool:
         # Update existing machine's type and location
         machine.type = device_data.machine_type
         machine.location = device_data.location
-    
+
     db.flush()
-    
+
     # 2. Add Monitor
     db.add(models.Monitor(
         mac=device_data.mac,

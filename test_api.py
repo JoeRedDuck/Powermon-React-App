@@ -229,7 +229,7 @@ def test_reassign_monitor(client):
         "/api/v1/monitors/2/reassign?machine_name=Machine A")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "reassigned"
+    assert data["status"] == "Monitor 2 reassigned to Machine A"
     assert data["monitor_id"] == 2
     assert data["machine_name"] == "Machine A"
 
@@ -265,7 +265,7 @@ def test_reassign_monitor_not_found(client):
     # Try nonexistent machine
     response = client.post(
         "/api/v1/monitors/1/reassign?machine_name=Nonexistent")
-    assert response.status_code == 404
+    assert response.status_code == 400
 
 
 def test_locations_list(client):

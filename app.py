@@ -11,7 +11,6 @@ import shutil
 import requests
 import json
 import argparse
-import warnings
 from dateutil import parser
 from dotenv import load_dotenv  # type: ignore
 from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
@@ -19,10 +18,6 @@ from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from pydantic import BaseModel, validator  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from sqlalchemy import text  # type: ignore
-
-# Suppress SSL certificate database warning from requests/urllib3
-warnings.filterwarnings('ignore', message='.*certificate.*')
-
 
 # --- Config ---
 load_dotenv()
@@ -390,8 +385,54 @@ def edit_device(mac: str, device: DeviceUpdate, session: Session = Depends(get_d
     raise HTTPException(status_code=404, detail={"status": "not_found"})
 
 
+@app.post("/api/v1/monitors/{monitor_id}/unassign")
+def unassign_monitor_endpoint(monitor_id: int, session: Session = Depends(get_db)):
+    """
+    Unassign a monitor from its current machine.
+    The monitor remains in the database but is no longer associated with any machine.
+    """
+    if db.unassign_monitor(session, monitor_id):
+        return {
+            "status": f"Monitor {monitor_id} unassigned successfully",
+            "monitor_id": monitor_id
+        }
+    raise HTTPException(
+        status_code=404,
+        detail=f"Monitor with id {monitor_id} not found"
+    )
+
+
+@app.delete("/api/v1/monitors/{monitor_id}")
+def delete_monitor_endpoint(monitor_id: int, session: Session = Depends(get_db)):
+    """
+    Permanently delete a monitor from the database.
+    Note: Monitors with associated poll data cannot be deleted.
+    Use the unassign endpoint instead to preserve historical data.
+    """
+    success, error_message = db.delete_monitor(session, monitor_id)
+
+    if success:
+        return {
+            "status": f"Monitor {monitor_id} deleted successfully",
+            "monitor_id": monitor_id
+        }
+
+    if error_message:
+        # Constraint violation or other database error
+        raise HTTPException(
+            status_code=400,
+            detail=error_message
+        )
+
+    # Monitor not found
+    raise HTTPException(
+        status_code=404,
+        detail=f"Monitor with id {monitor_id} not found"
+    )
+
+
 @app.post("/api/v1/monitors/{monitor_id}/reassign")
-def reassign_monitor(monitor_id: int, machine_name: str = Query(...), session: Session = Depends(get_db)):
+def reassign_monitor_endpoint(monitor_id: int, machine_name: str = Query(...), session: Session = Depends(get_db)):
     """
     Reassign a monitor to a different machine.
 
@@ -402,12 +443,44 @@ def reassign_monitor(monitor_id: int, machine_name: str = Query(...), session: S
     Query params:
         machine_name: The name of the machine to assign the monitor to
     """
+    # Validate machine_name parameter
+    if not machine_name or not machine_name.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="machine_name query parameter is required"
+        )
+
+    # Check if monitor exists first
+    monitor = session.query(models.Monitor).filter(
+        models.Monitor.id == monitor_id).first()
+    if not monitor:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Monitor with id {monitor_id} not found"
+        )
+
+    # Check if machine exists
+    machine = session.query(models.Machine).filter(
+        models.Machine.name == machine_name).first()
+    if not machine:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Machine '{machine_name}' not found"
+        )
+
+    # Perform the reassignment
     if db.reassign_monitor(session, monitor_id, machine_name):
-        return {"status": "reassigned", "monitor_id": monitor_id, "machine_name": machine_name}
-    raise HTTPException(status_code=404, detail={
-        "status": "not_found",
-        "reason": "Monitor or machine not found"
-    })
+        return {
+            "status": f"Monitor {monitor_id} reassigned to {machine_name}",
+            "monitor_id": monitor_id,
+            "machine_name": machine_name
+        }
+
+    # This should not happen given the checks above, but handle it anyway
+    raise HTTPException(
+        status_code=500,
+        detail="Failed to reassign monitor"
+    )
 
 
 @app.post("/api/v1/devices")
