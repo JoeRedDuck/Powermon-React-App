@@ -41,9 +41,36 @@ export default function ManageMonitors()  {
     };
   }, [])
 
+  // Handler to refresh list after delete/unassign
+  const handleMonitorDelete = (monitorId) => {
+    console.log(`Monitor ${monitorId} deleted/unassigned - refreshing list`);
+    // The useEffect will handle the refresh via the interval
+    // But we can also trigger immediate refresh
+    const apiBase =
+      process.env.EXPO_PUBLIC_API_BASE ||
+      Constants.expoConfig?.extra?.apiBase ||
+      '';
+    const url = `${apiBase.replace(/\/$/, '')}/api/v1/monitors`;
+    
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setMonitors(data);
+        else if (data && Array.isArray(data.monitors)) setMonitors(data.monitors);
+        else setMonitors([]);
+      })
+      .catch(err => console.error('refresh failed', err));
+  }
+
   return (
     <ScrollView>
-      {monitors.map(m => <ManageMonitorCard key={m.mac} monitor={m}></ManageMonitorCard>)}
+      {monitors.map(m => (
+        <ManageMonitorCard 
+          key={m.mac} 
+          monitor={m}
+          onDelete={handleMonitorDelete}
+        />
+      ))}
     </ScrollView>
   )
 }

@@ -1,6 +1,126 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import Constants from "expo-constants";
+import { router } from "expo-router";
+import { useState } from "react";
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function ManageMonitorCard({monitor, onDelete}) {
+  const [busy, setBusy] = useState(false);
+
+  const apiBase =
+    process.env.EXPO_PUBLIC_API_BASE ||
+    Constants.expoConfig?.extra?.apiBase ||
+    '';
+  const base = `${apiBase.replace(/\/$/, '')}/api/v1`;
+
+  // Handle edit - navigate to edit screen (to be implemented)
+  async function handleEdit() {
+    if (busy) return;
+    
+    // Option 1: Navigate to a dedicated edit monitor screen
+    // router.push({ pathname: "/editMonitor", params: { monitorId: monitor.id } });
+    
+    // Option 2: Show a simple alert for now with instructions
+    Alert.alert(
+      "Edit Monitor",
+      `To edit monitor ${monitor.id}, you need to:\n\n1. Create an edit screen at /app/editMonitor.jsx\n2. Load available machines\n3. Allow reassignment via POST /api/v1/monitors/${monitor.id}/reassign?machine_name=<name>`,
+      [{ text: "OK" }]
+    );
+  }
+
+  // Handle remove/delete
+  async function handleRemove() {
+    if (busy) return;
+
+    // Show confirmation with options
+    const alertOptions = Platform.select({
+      web: { text: "Unassign", onPress: () => unassignMonitor() },
+      default: [
+        { text: "Cancel", style: "cancel" },
+        { text: "Unassign Only", onPress: () => unassignMonitor() },
+        { text: "Delete Permanently", onPress: () => deleteMonitor(), style: "destructive" }
+      ]
+    });
+
+    if (Platform.OS === 'web') {
+      // Web doesn't support multiple buttons well
+      const confirmed = confirm(
+        `Do you want to unassign Monitor ${monitor.id}?\n\n` +
+        `This will remove the monitor from ${monitor.name || 'the machine'} but keep it in the system.`
+      );
+      if (confirmed) await unassignMonitor();
+    } else {
+      Alert.alert(
+        "Remove Monitor",
+        `Monitor ${monitor.id} is assigned to ${monitor.name || 'a machine'}.\n\nWhat would you like to do?`,
+        alertOptions
+      );
+    }
+  }
+
+  // Unassign monitor from machine
+  async function unassignMonitor() {
+    setBusy(true);
+    try {
+      const res = await fetch(`${base}/monitors/${monitor.id}/unassign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!res.ok) {
+        let errorMsg;
+        try {
+          const body = await res.json();
+          errorMsg = body?.detail?.reason || body?.detail || body?.message || body?.error;
+        } catch {
+          errorMsg = await res.text();
+        }
+        throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      }
+
+      Alert.alert("Success", `Monitor ${monitor.id} has been unassigned`);
+      
+      // Call parent callback to refresh list
+      if (onDelete) onDelete(monitor.id);
+      
+    } catch (err) {
+      Alert.alert("Error", `Failed to unassign monitor: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Delete monitor permanently
+  async function deleteMonitor() {
+    setBusy(true);
+    try {
+      const res = await fetch(`${base}/monitors/${monitor.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!res.ok) {
+        let errorMsg;
+        try {
+          const body = await res.json();
+          errorMsg = body?.detail?.reason || body?.detail || body?.message || body?.error;
+        } catch {
+          errorMsg = await res.text();
+        }
+        throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      }
+
+      Alert.alert("Success", `Monitor ${monitor.id} has been permanently deleted`);
+      
+      // Call parent callback to refresh list
+      if (onDelete) onDelete(monitor.id);
+      
+    } catch (err) {
+      Alert.alert("Error", `Failed to delete monitor: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
      <View style={styles.container}>
       <View style={styles.card}>
@@ -21,18 +141,21 @@ export default function ManageMonitorCard({monitor, onDelete}) {
 
         <View>
           <Text style={styles.label}>Assigned Machine</Text>
-          <Text style={styles.attribute}>{monitor.name}</Text>
+          <Text style={styles.attribute}>{monitor.name || monitor.machine_name || "Unassigned"}</Text>
         </View>
 
         <View style={styles.line}></View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity>
-            <Text style={styles.edit}>Edit</Text>
+          <TouchableOpacity onPress={handleEdit} disabled={busy}>
+            <Text style={[styles.edit, busy && styles.disabledText]}>Edit</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.removeButton}>
-            <Text style={styles.removeText}>Remove</Text>
+          <TouchableOpacity 
+            style={[styles.removeButton, busy && styles.disabledButton]} 
+            onPress={handleRemove}
+            disabled={busy}>
+            <Text style={styles.removeText}>{busy ? "Processing..." : "Remove"}</Text>
           </TouchableOpacity>
         </View>
 
@@ -78,6 +201,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     marginTop: 10
   },
+  disabledText: {
+    color: "#9CA3AF",
+    opacity: 0.5
+  },
   removeButton: {
     backgroundColor: "#EF4444",
     borderRadius: 7,
@@ -86,6 +213,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 3
+  },
+  disabledButton: {
+    backgroundColor: "#F87171",
+    opacity: 0.5
   },
   removeText: {
     fontSize: 15,
