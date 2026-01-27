@@ -315,8 +315,7 @@ def update_device(db: Session, mac: str, device_data) -> bool:
 
         # Reload the machine and monitor with the new name
         machine = db.query(models.Machine).filter_by(name=new_name).first()
-        monitor = db.query(models.Monitor).filter_by(
-            mac=device_data.mac).first()
+        monitor = db.query(models.Monitor).filter_by(mac=mac).first()
 
         # Verify reload was successful
         if not machine or not monitor:
