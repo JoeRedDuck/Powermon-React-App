@@ -1,5 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native';
 import Constants from 'expo-constants';
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView } from "react-native";
 import ManageDeviceCard from "../components/ManageDeviceCard";
 import sortDevices from "../utils/sortDevices";
