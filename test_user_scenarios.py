@@ -12,8 +12,11 @@ import models
 
 # Test database setup
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_user_scenarios.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={
+                       "check_same_thread": False})
+TestingSessionLocal = sessionmaker(
+    autocommit=False, autoflush=False, bind=engine)
+
 
 def override_get_db():
     db = TestingSessionLocal()
@@ -22,42 +25,53 @@ def override_get_db():
     finally:
         db.close()
 
-app.dependency_overrides[get_db] = override_get_db
-
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_database():
     """Reset database before each test."""
+    # Override dependency for this test module
+    app.dependency_overrides[get_db] = override_get_db
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    
+
     # Setup initial test data matching settings.json
     db = TestingSessionLocal()
     try:
         # Add machines
         machines = [
-            models.Machine(name="Condenser 1", type="condenser", location="Production line"),
-            models.Machine(name="Condenser 2", type="condenser", location="Production line"),
-            models.Machine(name="Pump 1", type="pump", location="Production line"),
-            models.Machine(name="Pump 2", type="pump", location="Production line"),
+            models.Machine(name="Condenser 1", type="condenser",
+                           location="Production line"),
+            models.Machine(name="Condenser 2", type="condenser",
+                           location="Production line"),
+            models.Machine(name="Pump 1", type="pump",
+                           location="Production line"),
+            models.Machine(name="Pump 2", type="pump",
+                           location="Production line"),
         ]
         db.add_all(machines)
-        
+
         # Add monitors
         monitors = [
-            models.Monitor(mac="A4:CF:12:FD:9D:5E", id=7, machine_name="Condenser 1"),
-            models.Monitor(mac="C8:C9:A3:1A:B9:5D", id=5, machine_name="Condenser 2"),
-            models.Monitor(mac="C8:C9:A3:1A:F2:DB", id=1, machine_name="Pump 1"),
-            models.Monitor(mac="08:3A:8D:FB:58:F5", id=2, machine_name=None),  # Orphaned
+            models.Monitor(mac="A4:CF:12:FD:9D:5E", id=7,
+                           machine_name="Condenser 1"),
+            models.Monitor(mac="C8:C9:A3:1A:B9:5D", id=5,
+                           machine_name="Condenser 2"),
+            models.Monitor(mac="C8:C9:A3:1A:F2:DB",
+                           id=1, machine_name="Pump 1"),
+            models.Monitor(mac="08:3A:8D:FB:58:F5", id=2,
+                           machine_name=None),  # Orphaned
         ]
         db.add_all(monitors)
         db.commit()
     finally:
         db.close()
-    
+
     yield
-    
+
+    # Clean up
     Base.metadata.drop_all(bind=engine)
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -80,7 +94,7 @@ def test_scenario_1_edit_device_name(client):
     condenser1 = next((d for d in devices if d["name"] == "Condenser 1"), None)
     assert condenser1 is not None
     mac = condenser1["mac"]
-    
+
     # Update only the name
     response = client.put(f"/api/v1/devices/{mac}", json={
         "name": "Test 1",
@@ -88,20 +102,22 @@ def test_scenario_1_edit_device_name(client):
         "machine_type": condenser1["machine_type"]
     })
     assert response.status_code == 200, f"Failed to update device name: {response.text}"
-    
+
     # Verify the change
     response = client.get("/api/v1/devices")
     devices = response.json()
     test1 = next((d for d in devices if d["name"] == "Test 1"), None)
     assert test1 is not None, "Device with new name 'Test 1' not found"
     assert test1["mac"] == mac, "MAC address changed (should not)"
-    assert test1["location"] == condenser1["location"], "Location changed (should not)"
-    assert test1["machine_type"] == condenser1["machine_type"], "Machine type changed (should not)"
-    
+    assert test1["location"] == condenser1[
+        "location"], "Location changed (should not)"
+    assert test1["machine_type"] == condenser1[
+        "machine_type"], "Machine type changed (should not)"
+
     # Verify old name is gone
     old_device = next((d for d in devices if d["name"] == "Condenser 1"), None)
     assert old_device is None, "Old device name still exists"
-    
+
     print("✓ TEST PASSED: Device name edited successfully")
 
 
@@ -118,7 +134,7 @@ def test_scenario_2_edit_machine_type(client):
     condenser2 = next((d for d in devices if d["name"] == "Condenser 2"), None)
     assert condenser2 is not None
     mac = condenser2["mac"]
-    
+
     # Update only the machine type
     response = client.put(f"/api/v1/devices/{mac}", json={
         "name": condenser2["name"],
@@ -126,16 +142,18 @@ def test_scenario_2_edit_machine_type(client):
         "machine_type": "pump"
     })
     assert response.status_code == 200, f"Failed to update machine type: {response.text}"
-    
+
     # Verify the change
     response = client.get("/api/v1/devices")
     devices = response.json()
-    updated_device = next((d for d in devices if d["name"] == "Condenser 2"), None)
+    updated_device = next(
+        (d for d in devices if d["name"] == "Condenser 2"), None)
     assert updated_device is not None
     assert updated_device["machine_type"] == "pump", "Machine type not updated"
-    assert updated_device["location"] == condenser2["location"], "Location changed (should not)"
+    assert updated_device["location"] == condenser2[
+        "location"], "Location changed (should not)"
     assert updated_device["name"] == condenser2["name"], "Name changed (should not)"
-    
+
     print("✓ TEST PASSED: Machine type edited successfully")
 
 
@@ -152,7 +170,7 @@ def test_scenario_3_edit_location(client):
     pump1 = next((d for d in devices if d["name"] == "Pump 1"), None)
     assert pump1 is not None
     mac = pump1["mac"]
-    
+
     # Update only the location
     response = client.put(f"/api/v1/devices/{mac}", json={
         "name": pump1["name"],
@@ -160,7 +178,7 @@ def test_scenario_3_edit_location(client):
         "machine_type": pump1["machine_type"]
     })
     assert response.status_code == 200, f"Failed to update location: {response.text}"
-    
+
     # Verify the change
     response = client.get("/api/v1/devices")
     devices = response.json()
@@ -168,8 +186,9 @@ def test_scenario_3_edit_location(client):
     assert updated_device is not None
     assert updated_device["location"] == "Test", "Location not updated"
     assert updated_device["name"] == pump1["name"], "Name changed (should not)"
-    assert updated_device["machine_type"] == pump1["machine_type"], "Machine type changed (should not)"
-    
+    assert updated_device["machine_type"] == pump1[
+        "machine_type"], "Machine type changed (should not)"
+
     print("✓ TEST PASSED: Location edited successfully")
 
 
@@ -185,28 +204,29 @@ def test_scenario_4_reassign_monitor_between_devices(client):
     response = client.get("/api/v1/monitors")
     monitors = response.json()
     assert any(m["id"] == 5 and m["name"] == "Condenser 2" for m in monitors)
-    
+
     # Reassign monitor 2 to Condenser 2 (replacing monitor 5)
-    response = client.post("/api/v1/monitors/2/reassign?machine_name=Condenser 2")
+    response = client.post(
+        "/api/v1/monitors/2/reassign?machine_name=Condenser 2")
     assert response.status_code == 200, f"Failed to reassign monitor: {response.text}"
     data = response.json()
     assert data["monitor_id"] == 2
     assert data["machine_name"] == "Condenser 2"
-    
+
     # Verify the changes
     response = client.get("/api/v1/monitors")
     monitors = response.json()
-    
+
     # Monitor 2 should now be assigned to Condenser 2
     monitor2 = next((m for m in monitors if m["id"] == 2), None)
     assert monitor2 is not None
     assert monitor2["name"] == "Condenser 2", "Monitor 2 not assigned to Condenser 2"
-    
+
     # Monitor 5 should now be orphaned (None)
     monitor5 = next((m for m in monitors if m["id"] == 5), None)
     assert monitor5 is not None
     assert monitor5["name"] is None, "Monitor 5 should be orphaned"
-    
+
     print("✓ TEST PASSED: Monitor reassigned between devices successfully")
 
 
@@ -220,29 +240,32 @@ def test_scenario_5_orphaned_monitor_replaces_running(client):
     # First make monitor 2 orphaned and assign monitor 5 to Condenser 2
     client.post("/api/v1/monitors/5/reassign?machine_name=Condenser 2")
     client.post("/api/v1/monitors/2/unassign")
-    
+
     # Verify initial state
     response = client.get("/api/v1/monitors")
     monitors = response.json()
-    assert any(m["id"] == 2 and m["name"] is None for m in monitors), "Monitor 2 should be orphaned"
-    assert any(m["id"] == 5 and m["name"] == "Condenser 2" for m in monitors), "Monitor 5 should be on Condenser 2"
-    
+    assert any(m["id"] == 2 and m["name"]
+               is None for m in monitors), "Monitor 2 should be orphaned"
+    assert any(m["id"] == 5 and m["name"] ==
+               "Condenser 2" for m in monitors), "Monitor 5 should be on Condenser 2"
+
     # Now reassign orphaned monitor 2 to Condenser 2 (replacing monitor 5)
-    response = client.post("/api/v1/monitors/2/reassign?machine_name=Condenser 2")
+    response = client.post(
+        "/api/v1/monitors/2/reassign?machine_name=Condenser 2")
     assert response.status_code == 200, f"Failed to reassign orphaned monitor: {response.text}"
-    
+
     # Verify the changes
     response = client.get("/api/v1/monitors")
     monitors = response.json()
-    
+
     # Monitor 2 should now be assigned to Condenser 2
     monitor2 = next((m for m in monitors if m["id"] == 2), None)
     assert monitor2["name"] == "Condenser 2", "Monitor 2 not assigned to Condenser 2"
-    
+
     # Monitor 5 should now be orphaned
     monitor5 = next((m for m in monitors if m["id"] == 5), None)
     assert monitor5["name"] is None, "Monitor 5 should be orphaned after replacement"
-    
+
     print("✓ TEST PASSED: Orphaned monitor replaced running monitor successfully")
 
 
@@ -259,11 +282,11 @@ def test_scenario_6_assign_monitor_to_machine_without_one(client):
     pump2 = next((d for d in devices if d["name"] == "Pump 2"), None)
     assert pump2 is not None
     assert pump2["mac"] is None or pump2["id"] is None, "Pump 2 should not have a monitor initially"
-    
+
     # Assign monitor 2 to Pump 2
     response = client.post("/api/v1/monitors/2/reassign?machine_name=Pump 2")
     assert response.status_code == 200, f"Failed to assign monitor to Pump 2: {response.text}"
-    
+
     # Verify the assignment
     response = client.get("/api/v1/devices")
     devices = response.json()
@@ -271,7 +294,7 @@ def test_scenario_6_assign_monitor_to_machine_without_one(client):
     assert pump2 is not None
     assert pump2["id"] == 2, "Monitor 2 not assigned to Pump 2"
     assert pump2["mac"] == "08:3A:8D:FB:58:F5", "Incorrect MAC for Monitor 2"
-    
+
     print("✓ TEST PASSED: Monitor assigned to machine without one successfully")
 
 
@@ -291,7 +314,7 @@ def test_scenario_7_add_new_machine_with_monitor(client):
         "location": "Lab"
     })
     assert response.status_code == 200, f"Failed to add new device: {response.text}"
-    
+
     # Verify it was added
     response = client.get("/api/v1/devices")
     devices = response.json()
@@ -301,7 +324,7 @@ def test_scenario_7_add_new_machine_with_monitor(client):
     assert test1["mac"] == "AA:BB:CC:DD:EE:FF", "MAC address incorrect"
     assert test1["machine_type"] == "test", "Machine type incorrect"
     assert test1["location"] == "Lab", "Location incorrect"
-    
+
     # Verify monitor was created
     response = client.get("/api/v1/monitors")
     monitors = response.json()
@@ -309,7 +332,7 @@ def test_scenario_7_add_new_machine_with_monitor(client):
     assert monitor1000 is not None, "Monitor 1000 not found"
     assert monitor1000["mac"] == "AA:BB:CC:DD:EE:FF", "Monitor MAC incorrect"
     assert monitor1000["name"] == "Test 1", "Monitor not assigned to Test 1"
-    
+
     print("✓ TEST PASSED: New machine with monitor added successfully")
 
 
@@ -323,7 +346,7 @@ def test_edit_device_preserves_monitor_assignment(client):
     condenser1 = next((d for d in devices if d["name"] == "Condenser 1"), None)
     original_monitor_id = condenser1["id"]
     mac = condenser1["mac"]
-    
+
     # Edit device name and location
     response = client.put(f"/api/v1/devices/{mac}", json={
         "name": "Updated Condenser",
@@ -331,15 +354,16 @@ def test_edit_device_preserves_monitor_assignment(client):
         "machine_type": condenser1["machine_type"]
     })
     assert response.status_code == 200
-    
+
     # Verify monitor assignment is preserved
     response = client.get("/api/v1/devices")
     devices = response.json()
-    updated = next((d for d in devices if d["name"] == "Updated Condenser"), None)
+    updated = next(
+        (d for d in devices if d["name"] == "Updated Condenser"), None)
     assert updated is not None
     assert updated["id"] == original_monitor_id, "Monitor assignment changed during edit"
     assert updated["mac"] == mac, "Monitor MAC changed during edit"
-    
+
     print("✓ TEST PASSED: Monitor assignment preserved during device edit")
 
 
@@ -351,7 +375,7 @@ def test_cannot_duplicate_machine_names(client):
     devices = response.json()
     condenser1 = next((d for d in devices if d["name"] == "Condenser 1"), None)
     condenser2 = next((d for d in devices if d["name"] == "Condenser 2"), None)
-    
+
     # Try to rename Condenser 2 to Condenser 1 (should fail)
     response = client.put(f"/api/v1/devices/{condenser2['mac']}", json={
         "name": "Condenser 1",
@@ -359,7 +383,7 @@ def test_cannot_duplicate_machine_names(client):
         "machine_type": condenser2["machine_type"]
     })
     assert response.status_code == 404, "Should not allow duplicate machine names"
-    
+
     print("✓ TEST PASSED: Duplicate machine names prevented")
 
 

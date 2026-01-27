@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from pydantic import BaseModel, validator  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from sqlalchemy import text  # type: ignore
+import urllib3  # type: ignore
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- Config ---
 load_dotenv()
@@ -269,6 +271,19 @@ def get_power_data(mac: str, time_range: str, bucket: str, session: Session = De
                  "3h": 180, "6h": 360, "12h": 720, "24h": 1440}
     buck_sec = {"10s": 10, "20s": 20, "30s": 30,
                 "1m": 60, "2m": 120, "5m": 300, "10m": 600}
+
+    # Validate parameters
+    if time_range not in range_min:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid time_range. Must be one of: {', '.join(range_min.keys())}"
+        )
+    if bucket not in buck_sec:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid bucket. Must be one of: {', '.join(buck_sec.keys())}"
+        )
+
     cutoff = datetime.now(timezone.utc) - \
         timedelta(minutes=range_min[time_range])
     rows = db.get_power(session, mac, cutoff)

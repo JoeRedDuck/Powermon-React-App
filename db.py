@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, aliased  # type: ignore
-from sqlalchemy import func, and_, desc, text  # type: ignore
+from sqlalchemy import func, and_, or_, desc, text  # type: ignore
 from sqlalchemy.exc import IntegrityError  # type: ignore
 from datetime import datetime
 import models
@@ -16,7 +16,7 @@ def get_devices(db: Session) -> List[Dict[str, Any]]:
     latest_poll = aliased(models.Poll)
 
     results = (
-        db.query(models.Monitor, models.Machine, latest_poll)
+        db.query(models.Machine, models.Monitor, latest_poll)
         .outerjoin(models.Monitor, models.Monitor.machine_name == models.Machine.name)
         .outerjoin(sub_stmt, models.Machine.name == sub_stmt.c.machine_name)
         .outerjoin(latest_poll, and_(
@@ -27,15 +27,15 @@ def get_devices(db: Session) -> List[Dict[str, Any]]:
     )
 
     return [{
-        "mac": m.mac if m else None,
-        "id": m.id if m else None,
+        "mac": mon.mac if mon else None,
+        "id": mon.id if mon else None,
         "name": mach.name,
-        "type": m.type if m else None,
+        "type": mon.type if mon else None,
         "machine_type": mach.type,
         "location": mach.location,
         "last_seen": p.poll_time if p else None,
         "last_power": p.power_usage if p else None
-    } for m, mach, p in results]
+    } for mach, mon, p in results]
 
 
 def get_power(db: Session, mac: str, cutoff: datetime) -> List[Dict[str, Any]]:
@@ -109,8 +109,8 @@ def delete_machine_by_name(db: Session, machine_name: str) -> bool:
 
 def delete_device(db: Session, mac: str) -> bool:
     """Delete a device by MAC address. Also deletes the associated machine."""
-    # Handle null/None MAC addresses
-    if not mac or mac.lower() == 'null' or mac.lower() == 'none':
+    # Handle null/None MAC addresses or empty strings
+    if not mac:
         return False
 
     monitor = db.query(models.Monitor).filter(
@@ -215,11 +215,15 @@ def reassign_monitor(db: Session, monitor_id: int, new_machine_name: str) -> boo
     if not machine:
         return False
 
-    # If the target machine already has a monitor, orphan it (set machine_name to None)
-    existing_monitor = db.query(models.Monitor).filter(
-        models.Monitor.machine_name == new_machine_name).first()
-    if existing_monitor:
-        existing_monitor.machine_name = None
+    # If the target machine already has monitors, orphan them (set machine_name to None)
+    # BUT: don't orphan the monitor we're trying to reassign (avoid self-orphaning)
+    existing_monitors = db.query(models.Monitor).filter(
+        models.Monitor.machine_name == new_machine_name
+    ).all()
+    for existing_monitor in existing_monitors:
+        # Skip if this is the monitor we're reassigning (compare by MAC, which is unique)
+        if existing_monitor.mac != monitor.mac:
+            existing_monitor.machine_name = None
 
     # Reassign the monitor to the new machine
     monitor.machine_name = new_machine_name
@@ -235,6 +239,12 @@ def update_device(db: Session, mac: str, device_data) -> bool:
         return False
 
     # Don't update monitor.id here - use reassign_monitor() for monitor reassignment
+
+    # Get the machine associated with this monitor
+    # If monitor has no machine_name, we can't update machine info
+    if not monitor.machine_name:
+        # Monitor is orphaned - cannot update machine info
+        return False
 
     # Update machine info linked to this monitor
     machine = db.query(models.Machine).filter(
@@ -323,9 +333,9 @@ def update_device(db: Session, mac: str, device_data) -> bool:
             return False
 
     # Update other machine fields (now safe to update after reload)
-    if device_data.machine_type:
+    if device_data.machine_type is not None:
         machine.type = device_data.machine_type
-    if device_data.location:
+    if device_data.location is not None:
         machine.location = device_data.location
 
     db.commit()
