@@ -11,44 +11,52 @@ export default function ManageDevices () {
   const TYPE_ORDER = ["IPM"]
   const LOCATION_ORDER = ["Production line"]
   
+  const apiBase =
+    process.env.EXPO_PUBLIC_API_BASE ||
+    Constants.expoConfig?.extra?.apiBase ||
+    '';
+  const base = `${apiBase.replace(/\/$/, '')}/api/v1/status`;
+
+  const fetchDevices = useCallback(() => {
+    const url = selectedLocation 
+      ? `${base}?location=${encodeURIComponent(selectedLocation)}` 
+      : base;
+
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setDevices(data);
+        else if (data && Array.isArray(data.devices)) setDevices(data.devices);
+        else setDevices([]);
+      })
+      .catch(err => {
+        console.error('status fetch failed', err);
+        setDevices([]);
+      });
+  }, [selectedLocation, base]);
+  
   useEffect(() => {
-    const apiBase =
-      process.env.EXPO_PUBLIC_API_BASE ||
-      Constants.expoConfig?.extra?.apiBase ||
-      '';
-    const base = `${apiBase.replace(/\/$/, '')}/api/v1/status`;
-
-
     let mounted = true;
 
-    const fetchDevices = () => {
-      const url = selectedLocation 
-        ? `${base}?location=${encodeURIComponent(selectedLocation)}` 
-        : base;
-
-      fetch(url)
-        .then(r => r.json())
-        .then(data => {
-          if (!mounted) return;
-          if (Array.isArray(data)) setDevices(data);
-          else if (data && Array.isArray(data.devices)) setDevices(data.devices);
-          else setDevices([]);
-        })
-        .catch(err => {
-          if (!mounted) return;
-          console.error('status fetch failed', err);
-          setDevices([]);
-        });
+    const wrappedFetch = () => {
+      if (mounted) fetchDevices();
     };
 
-    fetchDevices();
-    const id = setInterval(fetchDevices, 5000);
+    wrappedFetch();
+    const id = setInterval(wrappedFetch, 5000);
     
     return () => {
       mounted = false;
       clearInterval(id);
     };
-  }, [selectedLocation]);
+  }, [fetchDevices]);
+
+  // Refresh when screen comes into focus (after editing a device)
+  useFocusEffect(
+    useCallback(() => {
+      fetchDevices();
+    }, [fetchDevices])
+  );
 
   const handleDeleted = (mac) =>
   setDevices(list => list.filter(d => d.mac !== mac));
