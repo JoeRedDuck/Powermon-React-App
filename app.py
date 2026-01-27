@@ -1,8 +1,13 @@
+import os
+import sys
+# Suppress OpenSSL warnings before any imports that use SSL
+os.environ['PYTHONWARNINGS'] = 'ignore'
+os.environ['PYTHONHTTPSVERIFY'] = '0'
+
 from database import SessionLocal, get_db
 import models
 import db
 import asyncio
-import os
 import subprocess
 from datetime import datetime, timedelta, timezone
 from math import floor
@@ -20,6 +25,11 @@ from sqlalchemy.orm import Session  # type: ignore
 from sqlalchemy import text  # type: ignore
 import urllib3  # type: ignore
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Disable SSL verification globally for requests library
+requests.packages.urllib3.disable_warnings()
+import warnings
+warnings.filterwarnings('ignore')
 
 # --- Config ---
 load_dotenv()
