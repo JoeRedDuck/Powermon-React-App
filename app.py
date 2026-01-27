@@ -1,34 +1,34 @@
+import warnings
+import urllib3  # type: ignore
+from sqlalchemy import text  # type: ignore
+from sqlalchemy.orm import Session  # type: ignore
+from pydantic import BaseModel, validator  # type: ignore
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
+from dotenv import load_dotenv  # type: ignore
+from dateutil import parser
+import argparse
+import json
+import requests
+import shutil
+from typing import Optional, List
+from math import floor
+from datetime import datetime, timedelta, timezone
+import subprocess
+import asyncio
+import db
+import models
+from database import SessionLocal, get_db
 import os
 import sys
 # Suppress OpenSSL warnings before any imports that use SSL
 os.environ['PYTHONWARNINGS'] = 'ignore'
 os.environ['PYTHONHTTPSVERIFY'] = '0'
 
-from database import SessionLocal, get_db
-import models
-import db
-import asyncio
-import subprocess
-from datetime import datetime, timedelta, timezone
-from math import floor
-from typing import Optional, List
-import shutil
-import requests
-import json
-import argparse
-from dateutil import parser
-from dotenv import load_dotenv  # type: ignore
-from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
-from fastapi.middleware.cors import CORSMiddleware  # type: ignore
-from pydantic import BaseModel, validator  # type: ignore
-from sqlalchemy.orm import Session  # type: ignore
-from sqlalchemy import text  # type: ignore
-import urllib3  # type: ignore
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Disable SSL verification globally for requests library
 requests.packages.urllib3.disable_warnings()
-import warnings
 warnings.filterwarnings('ignore')
 
 # --- Config ---
@@ -142,7 +142,8 @@ def send_expo_notification(title: str, body: str, priority: str = "default"):
                     json=message,
                     headers={"Accept": "application/json",
                              "Content-Type": "application/json"},
-                    timeout=5
+                    timeout=5,
+                    verify=False  # Disable SSL verification to prevent OpenSSL warnings
                 )
                 if response.status_code != 200:
                     print(
