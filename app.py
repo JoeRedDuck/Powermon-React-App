@@ -1,3 +1,13 @@
+import os
+import sys
+# Suppress OpenSSL warnings at the C library level
+os.environ['PYTHONWARNINGS'] = 'ignore'
+os.environ['PYTHONHTTPSVERIFY'] = '0'
+os.environ['CURL_CA_BUNDLE'] = ''  # Disable curl CA bundle
+os.environ['REQUESTS_CA_BUNDLE'] = ''  # Disable requests CA bundle
+os.environ['SSL_CERT_FILE'] = '/dev/null'  # Point SSL cert file to null
+os.environ['SSL_CERT_DIR'] = '/dev/null'  # Point SSL cert dir to null
+
 import warnings
 import urllib3  # type: ignore
 from sqlalchemy import text  # type: ignore
@@ -19,11 +29,6 @@ import asyncio
 import db
 import models
 from database import SessionLocal, get_db
-import os
-import sys
-# Suppress OpenSSL warnings before any imports that use SSL
-os.environ['PYTHONWARNINGS'] = 'ignore'
-os.environ['PYTHONHTTPSVERIFY'] = '0'
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
