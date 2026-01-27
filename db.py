@@ -186,6 +186,64 @@ def delete_monitor(db: Session, monitor_id: int) -> Tuple[bool, Optional[str]]:
         return (False, f"Database constraint violation: {str(e)}")
 
 
+def create_monitor(db: Session, monitor_data) -> tuple[bool, Optional[str]]:
+    """
+    Create a new monitor, optionally assigning it to a machine.
+
+    Args:
+        db: Database session
+        monitor_data: MonitorCreate model with id, mac, and optional machine_name
+
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+    """
+    try:
+        # Check if monitor with this ID already exists
+        existing_monitor = db.query(models.Monitor).filter(
+            models.Monitor.id == monitor_data.id
+        ).first()
+        if existing_monitor:
+            return (False, f"Monitor with ID {monitor_data.id} already exists")
+
+        # Check if monitor with this MAC already exists
+        existing_mac = db.query(models.Monitor).filter(
+            models.Monitor.mac == monitor_data.mac
+        ).first()
+        if existing_mac:
+            return (False, f"Monitor with MAC {monitor_data.mac} already exists")
+
+        # If machine_name is provided, validate it exists
+        if monitor_data.machine_name:
+            machine = db.query(models.Machine).filter(
+                models.Machine.name == monitor_data.machine_name
+            ).first()
+            if not machine:
+                return (False, f"Machine '{monitor_data.machine_name}' not found")
+
+            # Orphan any existing monitors on this machine
+            existing_monitors = db.query(models.Monitor).filter(
+                models.Monitor.machine_name == monitor_data.machine_name
+            ).all()
+            for existing_monitor in existing_monitors:
+                existing_monitor.machine_name = None
+
+        # Create the new monitor
+        new_monitor = models.Monitor(
+            id=monitor_data.id,
+            mac=monitor_data.mac,
+            type="IPM",  # Default type
+            machine_name=monitor_data.machine_name
+        )
+        db.add(new_monitor)
+        db.commit()
+        db.refresh(new_monitor)
+
+        return (True, None)
+    except IntegrityError as e:
+        db.rollback()
+        return (False, f"Database error: {str(e)}")
+
+
 def reassign_monitor(db: Session, monitor_id: int, new_machine_name: str) -> bool:
     """
     Reassign a monitor to a different machine.

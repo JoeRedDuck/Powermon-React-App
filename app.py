@@ -1,3 +1,24 @@
+from database import SessionLocal, get_db
+import models
+import db
+import asyncio
+import subprocess
+from datetime import datetime, timedelta, timezone
+from math import floor
+from typing import Optional, List
+import shutil
+import requests
+import json
+import argparse
+from dateutil import parser
+from dotenv import load_dotenv  # type: ignore
+from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore
+from pydantic import BaseModel, validator  # type: ignore
+from sqlalchemy.orm import Session  # type: ignore
+from sqlalchemy import text  # type: ignore
+import urllib3  # type: ignore
+import warnings
 import os
 import sys
 # Suppress OpenSSL warnings at the C library level
@@ -8,27 +29,6 @@ os.environ['REQUESTS_CA_BUNDLE'] = ''  # Disable requests CA bundle
 os.environ['SSL_CERT_FILE'] = '/dev/null'  # Point SSL cert file to null
 os.environ['SSL_CERT_DIR'] = '/dev/null'  # Point SSL cert dir to null
 
-import warnings
-import urllib3  # type: ignore
-from sqlalchemy import text  # type: ignore
-from sqlalchemy.orm import Session  # type: ignore
-from pydantic import BaseModel, validator  # type: ignore
-from fastapi.middleware.cors import CORSMiddleware  # type: ignore
-from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
-from dotenv import load_dotenv  # type: ignore
-from dateutil import parser
-import argparse
-import json
-import requests
-import shutil
-from typing import Optional, List
-from math import floor
-from datetime import datetime, timedelta, timezone
-import subprocess
-import asyncio
-import db
-import models
-from database import SessionLocal, get_db
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -94,6 +94,18 @@ class PollCreate(BaseModel):
 class NotificationTokenCreate(BaseModel):
     token: str
     device_name: Optional[str] = None
+
+
+class MonitorCreate(BaseModel):
+    id: int
+    mac: str
+    machine_name: Optional[str] = None
+
+    @validator('mac')
+    def validate_mac(cls, v):
+        if not v or not v.strip():
+            raise ValueError('MAC address cannot be empty')
+        return v.strip()
 
 # --- Helpers ---
 
@@ -371,6 +383,39 @@ def list_types(session: Session = Depends(get_db)
 def list_monitors(session: Session = Depends(get_db)):
     """Get all monitors with their IDs, MAC addresses, and assignment status."""
     return db.get_monitors(session)
+
+
+@app.post("/api/v1/monitors", status_code=201)
+def create_monitor(monitor: MonitorCreate, session: Session = Depends(get_db)):
+    """
+    Create a new monitor, optionally assigning it to a machine.
+    
+    Request Body:
+    {
+        "id": 1,
+        "mac": "AA:BB:CC:DD:EE:FF",
+        "machine_name": "Pump 1"  // optional, null if unassigned
+    }
+    """
+    success, error_message = db.create_monitor(session, monitor)
+    
+    if success:
+        return {
+            "status": "Monitor created successfully",
+            "monitor": {
+                "id": monitor.id,
+                "mac": monitor.mac,
+                "machine_name": monitor.machine_name
+            }
+        }
+    
+    # Determine appropriate HTTP status code based on error
+    if "already exists" in error_message:
+        raise HTTPException(status_code=400, detail=error_message)
+    elif "not found" in error_message:
+        raise HTTPException(status_code=400, detail=error_message)
+    else:
+        raise HTTPException(status_code=422, detail=error_message)
 
 
 @app.get("/api/v1/device_stats")

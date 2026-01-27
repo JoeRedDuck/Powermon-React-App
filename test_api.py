@@ -268,6 +268,93 @@ def test_reassign_monitor_not_found(client):
     assert response.status_code == 400
 
 
+def test_create_monitor(client):
+    """Test creating a new monitor via POST /api/v1/monitors."""
+    # Create a machine first
+    client.post("/api/v1/devices", json={
+        "name": "Test Machine",
+        "mac": "AA:AA:AA:AA:AA:AA",
+        "machine_type": "test",
+        "location": "Lab",
+        "id": 100
+    })
+
+    # Create an unassigned monitor
+    response = client.post("/api/v1/monitors", json={
+        "id": 500,
+        "mac": "BB:BB:BB:BB:BB:BB",
+        "machine_name": None
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["status"] == "Monitor created successfully"
+    assert data["monitor"]["id"] == 500
+    assert data["monitor"]["mac"] == "BB:BB:BB:BB:BB:BB"
+    assert data["monitor"]["machine_name"] is None
+
+    # Create a monitor assigned to a machine
+    response = client.post("/api/v1/monitors", json={
+        "id": 501,
+        "mac": "CC:CC:CC:CC:CC:CC",
+        "machine_name": "Test Machine"
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["monitor"]["machine_name"] == "Test Machine"
+
+    # Verify via GET /api/v1/monitors
+    monitors = client.get("/api/v1/monitors").json()
+    new_monitors = [m for m in monitors if m["id"] in [500, 501]]
+    assert len(new_monitors) == 2
+
+
+def test_create_monitor_duplicate_id(client):
+    """Test that creating a monitor with duplicate ID fails."""
+    client.post("/api/v1/monitors", json={
+        "id": 600,
+        "mac": "DD:DD:DD:DD:DD:DD",
+        "machine_name": None
+    })
+    
+    # Try to create another with same ID
+    response = client.post("/api/v1/monitors", json={
+        "id": 600,
+        "mac": "EE:EE:EE:EE:EE:EE",
+        "machine_name": None
+    })
+    assert response.status_code == 400
+    assert "already exists" in response.json()["detail"]
+
+
+def test_create_monitor_duplicate_mac(client):
+    """Test that creating a monitor with duplicate MAC fails."""
+    client.post("/api/v1/monitors", json={
+        "id": 700,
+        "mac": "FF:FF:FF:FF:FF:FF",
+        "machine_name": None
+    })
+    
+    # Try to create another with same MAC
+    response = client.post("/api/v1/monitors", json={
+        "id": 701,
+        "mac": "FF:FF:FF:FF:FF:FF",
+        "machine_name": None
+    })
+    assert response.status_code == 400
+    assert "already exists" in response.json()["detail"]
+
+
+def test_create_monitor_nonexistent_machine(client):
+    """Test that assigning to nonexistent machine fails."""
+    response = client.post("/api/v1/monitors", json={
+        "id": 800,
+        "mac": "11:22:33:44:55:66",
+        "machine_name": "Nonexistent Machine"
+    })
+    assert response.status_code == 400
+    assert "not found" in response.json()["detail"]
+
+
 def test_locations_list(client):
     """Test listing unique locations."""
     create_dummy_device(client, mac="11:11:11", name="Dev1", location="Shop")
