@@ -400,7 +400,7 @@ def list_monitors(session: Session = Depends(get_db)):
 def create_monitor(monitor: MonitorCreate, session: Session = Depends(get_db)):
     """
     Create a new monitor, optionally assigning it to a machine.
-    
+
     Request Body:
     {
         "id": 1,
@@ -409,7 +409,7 @@ def create_monitor(monitor: MonitorCreate, session: Session = Depends(get_db)):
     }
     """
     success, error_message = db.create_monitor(session, monitor)
-    
+
     if success:
         return {
             "status": "Monitor created successfully",
@@ -419,7 +419,7 @@ def create_monitor(monitor: MonitorCreate, session: Session = Depends(get_db)):
                 "machine_name": monitor.machine_name
             }
         }
-    
+
     # Determine appropriate HTTP status code based on error
     if "already exists" in error_message:
         raise HTTPException(status_code=400, detail=error_message)
@@ -433,13 +433,13 @@ def create_monitor(monitor: MonitorCreate, session: Session = Depends(get_db)):
 def update_monitor(monitor_id: int, monitor_update: MonitorUpdate, session: Session = Depends(get_db)):
     """
     Update a monitor's ID and/or MAC address.
-    
+
     Request Body:
     {
         "id": 10,      // optional, new ID
         "mac": "AA:BB:CC:DD:EE:FF"  // optional, new MAC
     }
-    
+
     At least one field must be provided.
     """
     # Validate that at least one field is provided
@@ -448,15 +448,17 @@ def update_monitor(monitor_id: int, monitor_update: MonitorUpdate, session: Sess
             status_code=400,
             detail="At least one field (id or mac) must be provided"
         )
-    
-    success, error_message = db.update_monitor(session, monitor_id, monitor_update)
-    
+
+    success, error_message = db.update_monitor(
+        session, monitor_id, monitor_update)
+
     if success:
         # Get updated monitor info
         monitor = session.query(models.Monitor).filter(
-            models.Monitor.id == (monitor_update.id if monitor_update.id is not None else monitor_id)
+            models.Monitor.id == (
+                monitor_update.id if monitor_update.id is not None else monitor_id)
         ).first()
-        
+
         return {
             "status": "Monitor updated successfully",
             "monitor": {
@@ -465,11 +467,11 @@ def update_monitor(monitor_id: int, monitor_update: MonitorUpdate, session: Sess
                 "machine_name": monitor.machine_name
             }
         }
-    
+
     # Determine appropriate HTTP status code based on error
     if "not found" in error_message:
         raise HTTPException(status_code=404, detail=error_message)
-    elif "already exists" in error_message or "in use" in error_message:
+    elif "already exists" in error_message or "in use" in error_message or "poll" in error_message.lower():
         raise HTTPException(status_code=400, detail=error_message)
     else:
         raise HTTPException(status_code=422, detail=error_message)

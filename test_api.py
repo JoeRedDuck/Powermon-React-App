@@ -315,7 +315,7 @@ def test_create_monitor_duplicate_id(client):
         "mac": "DD:DD:DD:DD:DD:DD",
         "machine_name": None
     })
-    
+
     # Try to create another with same ID
     response = client.post("/api/v1/monitors", json={
         "id": 600,
@@ -333,7 +333,7 @@ def test_create_monitor_duplicate_mac(client):
         "mac": "FF:FF:FF:FF:FF:FF",
         "machine_name": None
     })
-    
+
     # Try to create another with same MAC
     response = client.post("/api/v1/monitors", json={
         "id": 701,
@@ -363,7 +363,7 @@ def test_update_monitor_id(client):
         "mac": "AA:AA:AA:AA:AA:AA",
         "machine_name": None
     })
-    
+
     # Update its ID
     response = client.put("/api/v1/monitors/900", json={
         "id": 901
@@ -373,7 +373,7 @@ def test_update_monitor_id(client):
     assert data["status"] == "Monitor updated successfully"
     assert data["monitor"]["id"] == 901
     assert data["monitor"]["mac"] == "AA:AA:AA:AA:AA:AA"
-    
+
     # Verify old ID is gone
     monitors = client.get("/api/v1/monitors").json()
     assert not any(m["id"] == 900 for m in monitors)
@@ -388,7 +388,7 @@ def test_update_monitor_mac(client):
         "mac": "BB:BB:BB:BB:BB:BB",
         "machine_name": None
     })
-    
+
     # Update its MAC
     response = client.put("/api/v1/monitors/910", json={
         "mac": "CC:CC:CC:CC:CC:CC"
@@ -407,7 +407,7 @@ def test_update_monitor_both(client):
         "mac": "DD:DD:DD:DD:DD:DD",
         "machine_name": None
     })
-    
+
     # Update both
     response = client.put("/api/v1/monitors/920", json={
         "id": 921,
@@ -439,7 +439,7 @@ def test_update_monitor_duplicate_id(client):
         "mac": "22:22:22:22:22:22",
         "machine_name": None
     })
-    
+
     # Try to change 931 to 930 (already exists)
     response = client.put("/api/v1/monitors/931", json={
         "id": 930
@@ -455,10 +455,38 @@ def test_update_monitor_no_fields(client):
         "mac": "33:33:33:33:33:33",
         "machine_name": None
     })
-    
+
     response = client.put("/api/v1/monitors/940", json={})
     assert response.status_code == 400
     assert "at least one field" in response.json()["detail"].lower()
+
+
+def test_update_monitor_mac_with_polls(client):
+    """Test that updating MAC fails when polls exist."""
+    # Create a device with monitor
+    client.post("/api/v1/devices", json={
+        "name": "Test Monitor Update",
+        "mac": "99:99:99:99:99:99",
+        "machine_type": "Test",
+        "location": "Lab",
+        "id": 950
+    })
+    
+    # Create a poll for this monitor
+    from datetime import datetime, timezone
+    client.post("/api/v1/polls", json={
+        "monitor_mac": "99:99:99:99:99:99",
+        "power_usage": 100.5,
+        "poll_time": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Try to update MAC - should fail
+    response = client.put("/api/v1/monitors/950", json={
+        "mac": "88:88:88:88:88:88"
+    })
+    assert response.status_code == 400
+    assert "poll" in response.json()["detail"].lower()
+    assert "cannot change" in response.json()["detail"].lower()
 
 
 def test_locations_list(client):

@@ -261,7 +261,7 @@ def update_monitor(db: Session, monitor_id: int, monitor_data) -> tuple[bool, Op
         monitor = db.query(models.Monitor).filter(
             models.Monitor.id == monitor_id
         ).first()
-        
+
         if not monitor:
             return (False, f"Monitor with ID {monitor_id} not found")
 
@@ -272,7 +272,7 @@ def update_monitor(db: Session, monitor_id: int, monitor_data) -> tuple[bool, Op
             ).first()
             if existing_id:
                 return (False, f"Monitor with ID {monitor_data.id} already exists")
-            
+
             monitor.id = monitor_data.id
 
         # If updating MAC, check it doesn't already exist
@@ -282,7 +282,15 @@ def update_monitor(db: Session, monitor_id: int, monitor_data) -> tuple[bool, Op
             ).first()
             if existing_mac:
                 return (False, f"Monitor with MAC {monitor_data.mac} already exists")
+
+            # Check if monitor has existing polls - cannot change MAC if polls exist
+            poll_count = db.query(models.Poll).filter(
+                models.Poll.monitor_mac == monitor.mac
+            ).count()
             
+            if poll_count > 0:
+                return (False, f"Cannot change MAC address: Monitor has {poll_count} existing poll records. MAC addresses cannot be changed once polls exist.")
+
             monitor.mac = monitor_data.mac
 
         db.commit()
