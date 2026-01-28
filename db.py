@@ -273,7 +273,10 @@ def update_monitor(db: Session, monitor_id: int, monitor_data) -> tuple[bool, Op
             if existing_id:
                 return (False, f"Monitor with ID {monitor_data.id} already exists")
 
-            monitor.id = monitor_data.id
+            # Store new ID for later
+            new_id = monitor_data.id
+        else:
+            new_id = monitor_id
 
         # If updating MAC, check it doesn't already exist and update associated polls
         if monitor_data.mac is not None and monitor_data.mac != monitor.mac:
@@ -283,14 +286,69 @@ def update_monitor(db: Session, monitor_id: int, monitor_data) -> tuple[bool, Op
             if existing_mac:
                 return (False, f"Monitor with MAC {monitor_data.mac} already exists")
 
-            # Update all poll records to reference the new MAC address
+            # Store old and new MAC addresses
             old_mac = monitor.mac
-            db.query(models.Poll).filter(
-                models.Poll.monitor_mac == old_mac
-            ).update({"monitor_mac": monitor_data.mac})
-
-            monitor.mac = monitor_data.mac
-
+            new_mac = monitor_data.mac
+            
+            from sqlalchemy import text
+            
+            try:
+                # Get database dialect to handle SQLite vs PostgreSQL differently
+                dialect = db.bind.dialect.name
+                
+                # Expunge the monitor from the session to avoid tracking issues
+                db.expunge(monitor)
+                
+                if dialect == 'postgresql':
+                    # PostgreSQL: Use deferred constraints
+                    db.execute(text("SET CONSTRAINTS ALL DEFERRED"))
+                elif dialect == 'sqlite':
+                    # SQLite: Disable FK checks temporarily
+                    db.execute(text("PRAGMA foreign_keys = OFF"))
+                
+                # Update both ID and MAC using raw SQL if needed
+                if new_id != monitor_id:
+                    # Update both ID and MAC
+                    db.execute(
+                        text("UPDATE monitor SET monitor_id = :new_id, monitor_mac_address = :new_mac WHERE monitor_mac_address = :old_mac"),
+                        {"new_id": new_id, "new_mac": new_mac, "old_mac": old_mac}
+                    )
+                else:
+                    # Update only MAC
+                    db.execute(
+                        text("UPDATE monitor SET monitor_mac_address = :new_mac WHERE monitor_mac_address = :old_mac"),
+                        {"new_mac": new_mac, "old_mac": old_mac}
+                    )
+                
+                # Update all polls that reference the old MAC
+                db.execute(
+                    text("UPDATE poll SET device_mac_address = :new_mac WHERE device_mac_address = :old_mac"),
+                    {"new_mac": new_mac, "old_mac": old_mac}
+                )
+                
+                if dialect == 'sqlite':
+                    # Re-enable FK checks
+                    db.execute(text("PRAGMA foreign_keys = ON"))
+                
+                # Commit the changes
+                db.commit()
+                return (True, None)
+                
+            except Exception as e:
+                db.rollback()
+                # Make sure to re-enable FK if we're on SQLite
+                if dialect == 'sqlite':
+                    try:
+                        db.execute(text("PRAGMA foreign_keys = ON"))
+                        db.commit()
+                    except:
+                        pass
+                return (False, f"Failed to update MAC address: {str(e)}")
+        
+        # If we only updated ID (not MAC), commit normally
+        if monitor_data.id is not None and monitor_data.id != monitor_id:
+            monitor.id = monitor_data.id
+        
         db.commit()
         return (True, None)
     except IntegrityError as e:

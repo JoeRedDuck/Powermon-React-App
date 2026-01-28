@@ -488,6 +488,7 @@ def test_update_monitor_mac_with_polls(client):
     response = client.put("/api/v1/monitors/950", json={
         "mac": "88:88:88:88:88:88"
     })
+    print(f"Status: {response.status_code}, Response: {response.json()}")
     assert response.status_code == 200
     assert response.json()["monitor"]["mac"] == "88:88:88:88:88:88"
 

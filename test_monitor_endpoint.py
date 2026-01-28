@@ -6,6 +6,7 @@ import json
 
 BASE_URL = "http://localhost:8000"
 
+
 def test_create_monitor():
     """Test creating a new monitor"""
     print("\n=== Test 1: Create new monitor (unassigned) ===")
@@ -20,7 +21,8 @@ def test_create_monitor():
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
     assert response.status_code == 201, f"Expected 201, got {response.status_code}"
-    
+
+
 def test_create_monitor_with_machine():
     """Test creating a monitor assigned to a machine"""
     print("\n=== Test 2: Create monitor assigned to Pump 1 ===")
@@ -35,6 +37,7 @@ def test_create_monitor_with_machine():
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
     assert response.status_code == 201, f"Expected 201, got {response.status_code}"
+
 
 def test_duplicate_id():
     """Test that duplicate ID is rejected"""
@@ -51,6 +54,7 @@ def test_duplicate_id():
     print(f"Response: {json.dumps(response.json(), indent=2)}")
     assert response.status_code == 400, f"Expected 400, got {response.status_code}"
 
+
 def test_duplicate_mac():
     """Test that duplicate MAC is rejected"""
     print("\n=== Test 4: Try to create duplicate MAC ===")
@@ -65,6 +69,7 @@ def test_duplicate_mac():
     print(f"Status: {response.status_code}")
     print(f"Response: {json.dumps(response.json(), indent=2)}")
     assert response.status_code == 400, f"Expected 400, got {response.status_code}"
+
 
 def test_nonexistent_machine():
     """Test that assigning to nonexistent machine is rejected"""
@@ -81,6 +86,7 @@ def test_nonexistent_machine():
     print(f"Response: {json.dumps(response.json(), indent=2)}")
     assert response.status_code == 400, f"Expected 400, got {response.status_code}"
 
+
 def test_list_monitors():
     """List all monitors to verify"""
     print("\n=== Test 6: List all monitors ===")
@@ -90,6 +96,7 @@ def test_list_monitors():
     for m in monitors:
         if m['id'] in [999, 998]:
             print(f"  Monitor {m['id']}: MAC={m['mac']}, Machine={m['name']}")
+
 
 if __name__ == "__main__":
     try:
