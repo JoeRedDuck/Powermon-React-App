@@ -355,6 +355,112 @@ def test_create_monitor_nonexistent_machine(client):
     assert "not found" in response.json()["detail"]
 
 
+def test_update_monitor_id(client):
+    """Test updating a monitor's ID."""
+    # Create a monitor first
+    client.post("/api/v1/monitors", json={
+        "id": 900,
+        "mac": "AA:AA:AA:AA:AA:AA",
+        "machine_name": None
+    })
+    
+    # Update its ID
+    response = client.put("/api/v1/monitors/900", json={
+        "id": 901
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "Monitor updated successfully"
+    assert data["monitor"]["id"] == 901
+    assert data["monitor"]["mac"] == "AA:AA:AA:AA:AA:AA"
+    
+    # Verify old ID is gone
+    monitors = client.get("/api/v1/monitors").json()
+    assert not any(m["id"] == 900 for m in monitors)
+    assert any(m["id"] == 901 for m in monitors)
+
+
+def test_update_monitor_mac(client):
+    """Test updating a monitor's MAC address."""
+    # Create a monitor first
+    client.post("/api/v1/monitors", json={
+        "id": 910,
+        "mac": "BB:BB:BB:BB:BB:BB",
+        "machine_name": None
+    })
+    
+    # Update its MAC
+    response = client.put("/api/v1/monitors/910", json={
+        "mac": "CC:CC:CC:CC:CC:CC"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["monitor"]["id"] == 910
+    assert data["monitor"]["mac"] == "CC:CC:CC:CC:CC:CC"
+
+
+def test_update_monitor_both(client):
+    """Test updating both ID and MAC."""
+    # Create a monitor first
+    client.post("/api/v1/monitors", json={
+        "id": 920,
+        "mac": "DD:DD:DD:DD:DD:DD",
+        "machine_name": None
+    })
+    
+    # Update both
+    response = client.put("/api/v1/monitors/920", json={
+        "id": 921,
+        "mac": "EE:EE:EE:EE:EE:EE"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["monitor"]["id"] == 921
+    assert data["monitor"]["mac"] == "EE:EE:EE:EE:EE:EE"
+
+
+def test_update_monitor_not_found(client):
+    """Test updating nonexistent monitor."""
+    response = client.put("/api/v1/monitors/9999", json={
+        "id": 9998
+    })
+    assert response.status_code == 404
+
+
+def test_update_monitor_duplicate_id(client):
+    """Test that updating to existing ID fails."""
+    client.post("/api/v1/monitors", json={
+        "id": 930,
+        "mac": "11:11:11:11:11:11",
+        "machine_name": None
+    })
+    client.post("/api/v1/monitors", json={
+        "id": 931,
+        "mac": "22:22:22:22:22:22",
+        "machine_name": None
+    })
+    
+    # Try to change 931 to 930 (already exists)
+    response = client.put("/api/v1/monitors/931", json={
+        "id": 930
+    })
+    assert response.status_code == 400
+    assert "already exists" in response.json()["detail"]
+
+
+def test_update_monitor_no_fields(client):
+    """Test that update with no fields fails."""
+    client.post("/api/v1/monitors", json={
+        "id": 940,
+        "mac": "33:33:33:33:33:33",
+        "machine_name": None
+    })
+    
+    response = client.put("/api/v1/monitors/940", json={})
+    assert response.status_code == 400
+    assert "at least one field" in response.json()["detail"].lower()
+
+
 def test_locations_list(client):
     """Test listing unique locations."""
     create_dummy_device(client, mac="11:11:11", name="Dev1", location="Shop")

@@ -107,6 +107,17 @@ class MonitorCreate(BaseModel):
             raise ValueError('MAC address cannot be empty')
         return v.strip()
 
+
+class MonitorUpdate(BaseModel):
+    id: Optional[int] = None
+    mac: Optional[str] = None
+
+    @validator('mac')
+    def validate_mac(cls, v):
+        if v is not None and (not v or not v.strip()):
+            raise ValueError('MAC address cannot be empty')
+        return v.strip() if v else None
+
 # --- Helpers ---
 
 
@@ -413,6 +424,52 @@ def create_monitor(monitor: MonitorCreate, session: Session = Depends(get_db)):
     if "already exists" in error_message:
         raise HTTPException(status_code=400, detail=error_message)
     elif "not found" in error_message:
+        raise HTTPException(status_code=400, detail=error_message)
+    else:
+        raise HTTPException(status_code=422, detail=error_message)
+
+
+@app.put("/api/v1/monitors/{monitor_id}")
+def update_monitor(monitor_id: int, monitor_update: MonitorUpdate, session: Session = Depends(get_db)):
+    """
+    Update a monitor's ID and/or MAC address.
+    
+    Request Body:
+    {
+        "id": 10,      // optional, new ID
+        "mac": "AA:BB:CC:DD:EE:FF"  // optional, new MAC
+    }
+    
+    At least one field must be provided.
+    """
+    # Validate that at least one field is provided
+    if monitor_update.id is None and monitor_update.mac is None:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one field (id or mac) must be provided"
+        )
+    
+    success, error_message = db.update_monitor(session, monitor_id, monitor_update)
+    
+    if success:
+        # Get updated monitor info
+        monitor = session.query(models.Monitor).filter(
+            models.Monitor.id == (monitor_update.id if monitor_update.id is not None else monitor_id)
+        ).first()
+        
+        return {
+            "status": "Monitor updated successfully",
+            "monitor": {
+                "id": monitor.id,
+                "mac": monitor.mac,
+                "machine_name": monitor.machine_name
+            }
+        }
+    
+    # Determine appropriate HTTP status code based on error
+    if "not found" in error_message:
+        raise HTTPException(status_code=404, detail=error_message)
+    elif "already exists" in error_message or "in use" in error_message:
         raise HTTPException(status_code=400, detail=error_message)
     else:
         raise HTTPException(status_code=422, detail=error_message)

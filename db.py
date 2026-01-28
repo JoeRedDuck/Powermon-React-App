@@ -244,6 +244,54 @@ def create_monitor(db: Session, monitor_data) -> tuple[bool, Optional[str]]:
         return (False, f"Database error: {str(e)}")
 
 
+def update_monitor(db: Session, monitor_id: int, monitor_data) -> tuple[bool, Optional[str]]:
+    """
+    Update a monitor's ID and/or MAC address.
+
+    Args:
+        db: Database session
+        monitor_id: Current ID of the monitor to update
+        monitor_data: MonitorUpdate model with optional new id and/or mac
+
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+    """
+    try:
+        # Find the monitor to update
+        monitor = db.query(models.Monitor).filter(
+            models.Monitor.id == monitor_id
+        ).first()
+        
+        if not monitor:
+            return (False, f"Monitor with ID {monitor_id} not found")
+
+        # If updating ID, check it doesn't already exist
+        if monitor_data.id is not None and monitor_data.id != monitor_id:
+            existing_id = db.query(models.Monitor).filter(
+                models.Monitor.id == monitor_data.id
+            ).first()
+            if existing_id:
+                return (False, f"Monitor with ID {monitor_data.id} already exists")
+            
+            monitor.id = monitor_data.id
+
+        # If updating MAC, check it doesn't already exist
+        if monitor_data.mac is not None and monitor_data.mac != monitor.mac:
+            existing_mac = db.query(models.Monitor).filter(
+                models.Monitor.mac == monitor_data.mac
+            ).first()
+            if existing_mac:
+                return (False, f"Monitor with MAC {monitor_data.mac} already exists")
+            
+            monitor.mac = monitor_data.mac
+
+        db.commit()
+        return (True, None)
+    except IntegrityError as e:
+        db.rollback()
+        return (False, f"Database error: {str(e)}")
+
+
 def reassign_monitor(db: Session, monitor_id: int, new_machine_name: str) -> bool:
     """
     Reassign a monitor to a different machine.
