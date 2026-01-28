@@ -17,7 +17,6 @@ export default function AddDevice () {
   const [error, setError] = useState(null)
   const [isEdit, setIsEdit] = useState(false);
   const { mac: macParam } = useLocalSearchParams();  // Actually receives machine name for editing
-  const [machineTypes, setMachineTypes] = useState([])
   const [availableMonitors, setAvailableMonitors] = useState([])
   const apiBase =
       process.env.EXPO_PUBLIC_API_BASE ||
@@ -46,14 +45,6 @@ export default function AddDevice () {
       setDevice(null);
     }
   };
-
-  useEffect(() => {
-      const url = `${base}/machine_types`
-      fetch(url)
-        .then(r => r.json())
-        .then(setMachineTypes)   // populate dropdown
-        .catch(() => setMachineTypes([])); // fallback empty
-    }, []);
 
   // Fetch available monitors for assignment
   useEffect(() => {
@@ -236,18 +227,13 @@ export default function AddDevice () {
 
     <View>
         <Text style={styles.label}>Machine Type:</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker
-            style={styles.selector}
-            dropdownIconColor="#111827"
-            selectedValue = {machineType}
-            onValueChange={(v) => setMachineType(v)}>
-
-            <Picker.Item label="Select..." value="" enabled={false} />
-            {machineTypes.map((type) => ( <Picker.Item key={type} label={type} value={type} /> ))}
-            
-          </Picker>
-        </View>
+        <TextInput 
+          style={styles.input}
+          placeholder="Pump"
+          placeholderTextColor="#9CA3AF"
+          value={machineType}
+          onChangeText={setMachineType}>
+        </TextInput>
       </View>
 
       <View>
