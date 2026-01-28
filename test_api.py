@@ -462,7 +462,7 @@ def test_update_monitor_no_fields(client):
 
 
 def test_update_monitor_mac_with_polls(client):
-    """Test that updating MAC fails when polls exist."""
+    """Test that updating MAC also updates all associated polls."""
     # Create a device with monitor
     client.post("/api/v1/devices", json={
         "name": "Test Monitor Update",
@@ -471,7 +471,7 @@ def test_update_monitor_mac_with_polls(client):
         "location": "Lab",
         "id": 950
     })
-    
+
     # Create a poll for this monitor
     from datetime import datetime, timezone
     client.post("/api/v1/polls", json={
@@ -479,14 +479,26 @@ def test_update_monitor_mac_with_polls(client):
         "power_usage": 100.5,
         "poll_time": datetime.now(timezone.utc).isoformat()
     })
-    
-    # Try to update MAC - should fail
+
+    # Verify poll was created with old MAC
+    poll_count_old = client.post("/api/v1/checkPoll/99:99:99:99:99:99").json()
+    assert poll_count_old["count"] == 1
+
+    # Update MAC - should succeed and update polls
     response = client.put("/api/v1/monitors/950", json={
         "mac": "88:88:88:88:88:88"
     })
-    assert response.status_code == 400
-    assert "poll" in response.json()["detail"].lower()
-    assert "cannot change" in response.json()["detail"].lower()
+    assert response.status_code == 200
+    assert response.json()["monitor"]["mac"] == "88:88:88:88:88:88"
+
+    # Verify poll was moved to new MAC
+    poll_count_new = client.post("/api/v1/checkPoll/88:88:88:88:88:88").json()
+    assert poll_count_new["count"] == 1
+
+    # Old MAC should have no polls
+    poll_count_old_after = client.post(
+        "/api/v1/checkPoll/99:99:99:99:99:99").json()
+    assert poll_count_old_after["count"] == 0
 
 
 def test_locations_list(client):
