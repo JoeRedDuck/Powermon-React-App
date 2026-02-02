@@ -1,8 +1,18 @@
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
 import StatusPill from "../components/StatusPill";
+import { isMachineMuted } from "../utils/muteService.jsx";
 
 export default function DeviceCard ({ device }) {
+  const [isMuted, setIsMuted] = useState(false);
+
+  useEffect(() => {
+    if (device?.mac) {
+      isMachineMuted(device.mac).then(setIsMuted);
+    }
+  }, [device?.mac]);
 
   if (!device) { console.warn('DeviceCard: missing device prop'); return null; }
 
@@ -38,7 +48,12 @@ export default function DeviceCard ({ device }) {
       <View style={cardStyle}>
 
         <View style={{flexDirection: "row", alignItems: "center", justifyContent: "space-between"}}>
-          <Text style={{fontSize: 22, fontWeight: "600"}}>{device.name}</Text>
+          <View style={{flexDirection: "row", alignItems: "center", gap: 8}}>
+            <Text style={{fontSize: 22, fontWeight: "600"}}>{device.name}</Text>
+            {isMuted && (
+              <Ionicons name="notifications-off" size={20} color="#EF4444" />
+            )}
+          </View>
 
           <StatusPill status={device.status}/>
         </View>

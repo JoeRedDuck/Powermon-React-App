@@ -24,6 +24,12 @@ export default function Menu () {
           <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
         </View>
       </TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push({pathname: "/mutedDevices"})}>
+        <View style={styles.settings_container}>
+          <Text style={styles.optionText}>Muted Devices</Text>
+          <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
+        </View>
+      </TouchableOpacity>
     </View>
   )
 }
