@@ -1,8 +1,8 @@
-import Constants from 'expo-constants';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from "react";
 import { ScrollView } from "react-native";
 import DeviceCard from '../components/DeviceCard';
+import { getApiUrl } from "../utils/apiConfig";
 import sortDevices from '../utils/sortDevices';
 
 
@@ -25,44 +25,49 @@ export default function Status() {
   }, [location,machine_type,status])
 
   useEffect(() => {
-    const apiBase =
-      process.env.EXPO_PUBLIC_API_BASE ||
-      Constants.expoConfig?.extra?.apiBase ||
-      '';
-    const base = `${apiBase.replace(/\/$/, '')}/api/v1/status`;
-
-
     let mounted = true;
-
-    const fetchDevices = () => {
-      const params = new URLSearchParams();
-      if (selectedLocation) params.append('location', selectedLocation);
-      if (selectedStatus) params.append('status', selectedStatus);
-      if (selectedMachineType) params.append('machine_type', selectedMachineType);
-
-      
-      const url = `${base}${params.toString() ? `?${params}` : ''}`;
-      fetch(url)
-        .then(r => r.json())
-        .then(data => {
-          if (!mounted) return;
-          if (Array.isArray(data)) setDevices(data);
-          else if (data && Array.isArray(data.devices)) setDevices(data.devices);
-          else setDevices([]);
-        })
-        .catch(err => {
-          if (!mounted) return;
-          console.error('status fetch failed', err);
-          setDevices([]);
-        });
-    };
-
-    fetchDevices();
-    const id = setInterval(fetchDevices, 5000);
     
+    getApiUrl().then(apiBase => {
+      if (!mounted) return;
+      const base = `${apiBase}/api/v1/status`;
+
+      const fetchDevices = () => {
+        const params = new URLSearchParams();
+        if (selectedLocation) params.append('location', selectedLocation);
+        if (selectedStatus) params.append('status', selectedStatus);
+        if (selectedMachineType) params.append('machine_type', selectedMachineType);
+
+        
+        const url = `${base}${params.toString() ? `?${params}` : ''}`;
+        fetch(url)
+          .then(r => r.json())
+          .then(data => {
+            if (!mounted) return;
+            if (Array.isArray(data)) setDevices(data);
+            else if (data && Array.isArray(data.devices)) setDevices(data.devices);
+            else setDevices([]);
+          })
+          .catch(err => {
+            if (!mounted) return;
+            console.error('status fetch failed', err);
+            setDevices([]);
+          });
+      };
+
+      fetchDevices();
+      const id = setInterval(fetchDevices, 5000);
+      
+      return () => {
+        mounted = false;
+        clearInterval(id);
+      };
+    }).catch(err => {
+      console.error('Failed to load API URL:', err);
+      setDevices([]);
+    });
+
     return () => {
       mounted = false;
-      clearInterval(id);
     };
   }, [selectedLocation, selectedStatus, selectedMachineType]);
 

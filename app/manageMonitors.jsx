@@ -1,17 +1,23 @@
-import Constants from 'expo-constants';
 import { useEffect, useState } from "react";
 import { ScrollView } from "react-native";
 import ManageMonitorCard from "../components/ManageMonitorCard";
+import { getApiUrl } from "../utils/apiConfig";
 
 export default function ManageMonitors()  {
   const [monitors, setMonitors] = useState([])
+  const [apiBase, setApiBase] = useState('')
+  
+  useEffect(() => {
+    getApiUrl().then(setApiBase).catch(err => {
+      console.error('Failed to load API URL:', err);
+      setApiBase('');
+    });
+  }, []);
 
   useEffect(() => {
-    const apiBase =
-      process.env.EXPO_PUBLIC_API_BASE ||
-      Constants.expoConfig?.extra?.apiBase ||
-      '';
-    const url = `${apiBase.replace(/\/$/, '')}/api/v1/monitors`;
+    if (!apiBase) return; // Don't fetch if API URL is not loaded yet
+    
+    const url = `${apiBase}/api/v1/monitors`;
     let mounted = true
 
     const fetchDevices = () => {
@@ -39,18 +45,16 @@ export default function ManageMonitors()  {
       mounted = false;
       clearInterval(id);
     };
-  }, [])
+  }, [apiBase])
 
   // Handler to refresh list after delete/unassign
   const handleMonitorDelete = (monitorId) => {
     console.log(`Monitor ${monitorId} deleted/unassigned - refreshing list`);
     // The useEffect will handle the refresh via the interval
     // But we can also trigger immediate refresh
-    const apiBase =
-      process.env.EXPO_PUBLIC_API_BASE ||
-      Constants.expoConfig?.extra?.apiBase ||
-      '';
-    const url = `${apiBase.replace(/\/$/, '')}/api/v1/monitors`;
+    if (!apiBase) return;
+    
+    const url = `${apiBase}/api/v1/monitors`;
     
     fetch(url)
       .then(r => r.json())

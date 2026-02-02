@@ -1,8 +1,8 @@
 import { Picker } from "@react-native-picker/picker";
-import Constants from "expo-constants";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { getApiUrl } from "../utils/apiConfig";
 
 export default function AddDevice () {
   const [device,setDevice] = useState(null)
@@ -18,11 +18,16 @@ export default function AddDevice () {
   const [isEdit, setIsEdit] = useState(false);
   const { mac: macParam } = useLocalSearchParams();  // Actually receives machine name for editing
   const [availableMonitors, setAvailableMonitors] = useState([])
-  const apiBase =
-      process.env.EXPO_PUBLIC_API_BASE ||
-      Constants.expoConfig?.extra?.apiBase ||
-      '';
-    const base = `${apiBase.replace(/\/$/, '')}/api/v1`
+  const [apiBase, setApiBase] = useState('')
+  
+  useEffect(() => {
+    getApiUrl().then(setApiBase).catch(err => {
+      console.error('Failed to load API URL:', err);
+      setApiBase('');
+    });
+  }, []);
+  
+  const base = apiBase ? `${apiBase}/api/v1` : ''
   
   function clearForm() {
   setMac("");
@@ -34,6 +39,10 @@ export default function AddDevice () {
   }
 
   const fetchDevice = async (machineNameToGet) => {
+    if (!base) {
+      console.warn('API base URL not loaded yet');
+      return;
+    }
     const url = `${base}/machines/${encodeURIComponent(machineNameToGet)}`;
     try {
       const res = await fetch(url);
@@ -48,7 +57,7 @@ export default function AddDevice () {
 
   // Fetch available monitors for assignment
   useEffect(() => {
-    if (!isEdit || mac) return; // Only fetch if editing and no monitor assigned
+    if (!isEdit || mac || !base) return; // Only fetch if editing and no monitor assigned
     
     const url = `${base}/monitors`;
     fetch(url)
@@ -59,17 +68,17 @@ export default function AddDevice () {
         setAvailableMonitors(sorted);
       })
       .catch(() => setAvailableMonitors([]));
-  }, [isEdit, mac]);
+  }, [isEdit, mac, base]);
 
   
   useEffect(() => {
-    if (typeof macParam === "string" && macParam.length) {
+    if (typeof macParam === "string" && macParam.length && base) {
       // macParam is actually the machine name when editing
       // Don't set mac state yet - wait for fetchDevice to populate it
       setIsEdit(true)
       fetchDevice(macParam)
     }
-  }, [macParam])
+  }, [macParam, base])
 
   useEffect(() => {
     if (!isEdit || !device) return;

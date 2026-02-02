@@ -1,20 +1,27 @@
-import Constants from 'expo-constants';
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import 'react-native-gesture-handler';
 import MetricCard from "../components/MetricCard";
+import { getApiUrl } from "../utils/apiConfig";
 
 export default function Index() {
   const [deviceStats, setDeviceStats] = useState({})
-  const apiBase =
-      process.env.EXPO_PUBLIC_API_BASE ||
-      Constants.expoConfig?.extra?.apiBase ||
-      '';
-    const base = `${apiBase.replace(/\/$/, '')}/api/v1`
+  const [apiBase, setApiBase] = useState('')
+  
+  useEffect(() => {
+    getApiUrl().then(setApiBase).catch(err => {
+      console.error('Failed to load API URL:', err);
+      setApiBase('');
+    });
+  }, []);
+  
+  const base = apiBase ? `${apiBase}/api/v1` : ''
 
   
 
   useEffect(() => {
+    if (!base) return; // Don't fetch if API URL is not loaded yet
+    
     const fetch_stats = () => {
       const url = `${base}/device_stats`
       fetch(url)
@@ -28,7 +35,7 @@ export default function Index() {
     return () => {
       clearInterval(id);
     };
-    }, []);
+    }, [base]);
 
   return (
     <ScrollView contentContainerStyle={styles.page}>

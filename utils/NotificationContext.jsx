@@ -6,6 +6,7 @@ import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
+import { getApiUrl } from "./apiConfig";
 
 const STORAGE_KEY = "powermon_notifications_v1";
 const NotificationContext = createContext(null);
@@ -23,13 +24,10 @@ export function NotificationProvider({ children }) {
         console.log("EXPO PUSH TOKEN:", token);
         
         // Register token with your API
-        const apiBase =
-          process.env.EXPO_PUBLIC_API_BASE ||
-          Constants.expoConfig?.extra?.apiBase ||
-          "";
-        const base = `${apiBase.replace(/\/$/, "")}/api/v1`;
-        
         try {
+          const apiBase = await getApiUrl();
+          const base = `${apiBase}/api/v1`;
+          
           const deviceName = Constants.deviceName || Device.modelName || "Unknown Device";
           const url = `${base}/notifications/register`;
           

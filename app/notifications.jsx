@@ -11,20 +11,28 @@ export default function NotificationsScreen () {
 
   return (
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scroll}>
-          
-          {notifications.map((notif) => (
-            <NotificationCard key={notif.id} notification={notif} />
-          ))}
-        </ScrollView>
-        <View style={styles.clearSection}>
-          <TouchableOpacity 
-            style={styles.clearButton}
-            onPress = {() => {clearAllNotifications()}}
-          >
-            <Text style={styles.clear}>Clear All</Text>
-          </TouchableOpacity>
-        </View>
+        {notifications.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No Notifications</Text>
+            <Text style={styles.emptyText}>You're all caught up!</Text>
+          </View>
+        ) : (
+          <>
+            <ScrollView contentContainerStyle={styles.scroll}>
+              {notifications.map((notif) => (
+                <NotificationCard key={notif.id} notification={notif} />
+              ))}
+            </ScrollView>
+            <View style={styles.clearSection}>
+              <TouchableOpacity 
+                style={styles.clearButton}
+                onPress = {() => {clearAllNotifications()}}
+              >
+                <Text style={styles.clearText}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
   )
 }
@@ -48,24 +56,45 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     gap: 10,
-    flex: 1
+    flex: 1,
+    backgroundColor: "#F9FAFB"
   },
   scroll: {
-    gap: 10
+    gap: 12,
+    paddingBottom: 10
   },
-  clear: {
-    color: "#2563EA"
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#111827"
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#6B7280"
+  },
+  clearText: {
+    color: "#2563EA",
+    fontSize: 16,
+    fontWeight: "500"
   },
   clearButton: {
-    height: 20,
-    width: 300,
-    justifyContent: "center",
-    alignItems: "center"
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB"
   },
   clearSection: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    paddingTop: 0
+    paddingVertical: 10
   },
 })

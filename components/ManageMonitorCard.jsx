@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
@@ -10,6 +11,12 @@ export default function ManageMonitorCard({monitor, onDelete}) {
     Constants.expoConfig?.extra?.apiBase ||
     '';
   const base = `${apiBase.replace(/\/$/, '')}/api/v1`;
+
+  // Handle edit - navigate to addMonitor in edit mode
+  function handleEdit() {
+    if (busy) return;
+    router.push({ pathname: "/addMonitor", params: { id: monitor.id } });
+  }
 
   // Handle remove/delete
   async function handleRemove() {
@@ -131,6 +138,10 @@ export default function ManageMonitorCard({monitor, onDelete}) {
         <View style={styles.line}></View>
 
         <View style={styles.buttonContainer}>
+          <TouchableOpacity onPress={handleEdit} disabled={busy}>
+            <Text style={[styles.edit, busy && styles.disabledText]}>Edit</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity 
             style={[styles.removeButton, busy && styles.disabledButton]} 
             onPress={handleRemove}

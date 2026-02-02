@@ -1,8 +1,8 @@
 import { Picker } from "@react-native-picker/picker";
-import Constants from "expo-constants";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { getApiUrl } from "../utils/apiConfig";
 
 export default function AddMonitor() {
   const [monitor, setMonitor] = useState(null);
@@ -14,12 +14,16 @@ export default function AddMonitor() {
   const [error, setError] = useState(null);
   const [isEdit, setIsEdit] = useState(false);
   const { id: idParam } = useLocalSearchParams();
+  const [apiBase, setApiBase] = useState('')
   
-  const apiBase =
-    process.env.EXPO_PUBLIC_API_BASE ||
-    Constants.expoConfig?.extra?.apiBase ||
-    '';
-  const base = `${apiBase.replace(/\/$/, '')}/api/v1`;
+  useEffect(() => {
+    getApiUrl().then(setApiBase).catch(err => {
+      console.error('Failed to load API URL:', err);
+      setApiBase('');
+    });
+  }, []);
+  
+  const base = apiBase ? `${apiBase}/api/v1` : '';
 
   function clearForm() {
     setMonitorId("");
@@ -28,6 +32,10 @@ export default function AddMonitor() {
   }
 
   const fetchMonitor = async (idToGet) => {
+    if (!base) {
+      console.warn('API base URL not loaded yet');
+      return;
+    }
     const url = `${base}/monitors`;
     try {
       const res = await fetch(url);
@@ -43,6 +51,8 @@ export default function AddMonitor() {
 
   // Fetch available machines
   useEffect(() => {
+    if (!base) return;
+    
     const url = `${base}/machines`;
     fetch(url)
       .then(r => r.json())
@@ -55,14 +65,14 @@ export default function AddMonitor() {
         setMachines(sorted);
       })
       .catch(() => setMachines([]));
-  }, []);
+  }, [base]);
 
   useEffect(() => {
-    if (typeof idParam === "string" && idParam.length) {
+    if (typeof idParam === "string" && idParam.length && base) {
       setIsEdit(true);
       fetchMonitor(idParam);
     }
-  }, [idParam]);
+  }, [idParam, base]);
 
   useEffect(() => {
     if (!isEdit || !monitor) return;
@@ -85,35 +95,84 @@ export default function AddMonitor() {
 
     try {
       if (isEdit) {
-        // For editing, only allow reassignment
-        if (!selectedMachine) {
-          Alert.alert("Info", "Please select a machine to assign the monitor to");
+        // For editing, validate required fields
+        if (!monitorId || !mac) {
+          Alert.alert("Error", "Please fill in Monitor ID and MAC Address");
           setBusy(false);
           return;
         }
 
-        const reassignRes = await fetch(
-          `${base}/monitors/${monitor.id}/reassign?machine_name=${encodeURIComponent(selectedMachine)}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" }
-          }
-        );
+        // Update monitor ID and MAC if changed
+        const payload = {
+          id: parseInt(monitorId, 10),
+          mac: mac
+        };
 
-        if (!reassignRes.ok) {
+        const updateRes = await fetch(`${base}/monitors/${monitor.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!updateRes.ok) {
           let msg;
           try {
-            const body = await reassignRes.json();
+            const body = await updateRes.json();
             msg = body?.detail?.reason || body?.detail || body?.message || body?.error;
           } catch {
-            msg = await reassignRes.text();
+            msg = await updateRes.text();
           }
           const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
-          Alert.alert("Error", `Reassignment failed: ${errorMsg}`);
-          throw new Error(errorMsg || `Reassignment failed (${reassignRes.status})`);
+          Alert.alert("Error", `Update failed: ${errorMsg}`);
+          throw new Error(errorMsg || `Update failed (${updateRes.status})`);
         }
 
-        Alert.alert("Success", `Monitor ${monitor.id} assigned to ${selectedMachine}`);
+        // If machine assignment changed, call reassign endpoint
+        const originalMachine = monitor.name || monitor.machine_name || '';
+        if (selectedMachine !== originalMachine) {
+          if (selectedMachine) {
+            // Reassign to a machine
+            const reassignRes = await fetch(
+              `${base}/monitors/${parseInt(monitorId, 10)}/reassign?machine_name=${encodeURIComponent(selectedMachine)}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+              }
+            );
+
+            if (!reassignRes.ok) {
+              let msg;
+              try {
+                const body = await reassignRes.json();
+                msg = body?.detail?.reason || body?.detail || body?.message || body?.error;
+              } catch {
+                msg = await reassignRes.text();
+              }
+              const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
+              Alert.alert("Warning", `Monitor updated but reassignment failed: ${errorMsg}`);
+            }
+          } else if (originalMachine) {
+            // Unassign from machine
+            const unassignRes = await fetch(`${base}/monitors/${parseInt(monitorId, 10)}/unassign`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" }
+            });
+
+            if (!unassignRes.ok) {
+              let msg;
+              try {
+                const body = await unassignRes.json();
+                msg = body?.detail?.reason || body?.detail || body?.message || body?.error;
+              } catch {
+                msg = await unassignRes.text();
+              }
+              const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
+              Alert.alert("Warning", `Monitor updated but unassignment failed: ${errorMsg}`);
+            }
+          }
+        }
+
+        Alert.alert("Success", "Monitor updated successfully");
         router.back();
         return;
       }
@@ -171,9 +230,7 @@ export default function AddMonitor() {
           placeholderTextColor="#9CA3AF"
           value={monitorId}
           onChangeText={setMonitorId}
-          keyboardType="numeric"
-          editable={!isEdit}
-          selectTextOnFocus={!isEdit}>
+          keyboardType="numeric">
         </TextInput>
       </View>
 
@@ -184,9 +241,7 @@ export default function AddMonitor() {
           placeholder="C8:C9:A3:1A:F2:DB"
           placeholderTextColor="#9CA3AF"
           value={mac}
-          onChangeText={setMac}
-          editable={!isEdit}
-          selectTextOnFocus={!isEdit}>
+          onChangeText={setMac}>
         </TextInput>
       </View>
 
@@ -254,9 +309,9 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   form: {
-    justifyContent: "space-evenly",
     paddingHorizontal: 20,
-    height: "100%"
+    paddingVertical: 30,
+    gap: 20,
   },
   label: {
     fontSize: 20,

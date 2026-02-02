@@ -1,5 +1,4 @@
 import { Picker } from "@react-native-picker/picker";
-import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { router, Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import { useEffect, useState } from 'react';
@@ -14,6 +13,7 @@ import MenuIcon from "../assets/icons/menu.svg";
 import AddDeviceIcon from "../assets/icons/plus-circle.svg";
 import ManageDevicesIcon from "../assets/icons/settings.svg";
 import FilterIcon from "../assets/icons/sliders.svg";
+import { getApiUrl } from "../utils/apiConfig";
 import useGetDevice from "../utils/getDevice.jsx";
 import { NotificationProvider } from "../utils/NotificationContext";
 
@@ -40,23 +40,30 @@ export default function RootLayout() {
   const [machine_type, setMachineType] = useState("")
 
   useEffect(() => {
-    if (pathname !== "/status" && filterOpen) setFilterOpen(false)
+    if (pathname !== "/status" && pathname !== "/manageDevices" && filterOpen) setFilterOpen(false)
   }, [pathname, filterOpen]);
 
   useEffect(() => {
     if (!filterOpen) return;
-    const apiBase = (process.env.EXPO_PUBLIC_API_BASE || Constants.expoConfig?.extra?.apiBase || '').replace(/\/$/, '');
-    const base = `${apiBase}/api/v1`;
+    
+    // Load API URL asynchronously
+    getApiUrl().then(apiBase => {
+      const base = `${apiBase}/api/v1`;
 
-    fetch(`${base}/machine_types`)
-      .then(r => r.json())
-      .then(setMachineTypes)
-      .catch(() => setMachineTypes([]));
+      fetch(`${base}/machine_types`)
+        .then(r => r.json())
+        .then(setMachineTypes)
+        .catch(() => setMachineTypes([]));
 
-    fetch(`${base}/locations`)
-      .then(r => r.json())
-      .then(setLocations)
-      .catch(() => setLocations([]));
+      fetch(`${base}/locations`)
+        .then(r => r.json())
+        .then(setLocations)
+        .catch(() => setLocations([]));
+    }).catch(err => {
+      console.error('Failed to load API URL:', err);
+      setMachineTypes([]);
+      setLocations([]);
+    });
   }, [filterOpen]);
 
   useEffect(() => {
@@ -73,6 +80,7 @@ export default function RootLayout() {
       status: status || undefined
     };
     if (pathname === "/status") router.setParams(params);
+    else if (pathname === "/manageDevices") router.setParams(params);
     else router.push({pathname: "/status", params})
     setFilterOpen(false); 
   }
@@ -88,6 +96,7 @@ export default function RootLayout() {
               <View style={{position: "absolute", top: 0, bottom: 0, left: 0, right: 0,  backgroundColor: "#F3F4F6"}}>
                 <View style={styles.form}>
                   <Text style={styles.menuTitle}>Filter Options</Text>
+                  
                   <View>
                     <Text style={styles.label}>Status:</Text>
                     <View style={styles.pickerWrapper}>
@@ -131,11 +140,14 @@ export default function RootLayout() {
                       </Picker>
                     </View>
                   </View>
+
+                  <View>
                     <TouchableOpacity 
                       style={styles.applyButton}
                       onPress={applyFilters}>
                       <Text style={styles.applyText}>Apply</Text>
                     </TouchableOpacity>
+                  </View>
                   
                 </View>
               </View>)}
@@ -149,7 +161,7 @@ export default function RootLayout() {
 
 function Topbar({ filterOpen, setFilterOpen }) {
   const filterOptions = {}
-  const { mac } = useGlobalSearchParams();
+  const { mac, id } = useGlobalSearchParams();
   const pathname = usePathname()
 
   // Only fetch device by MAC for /device route, not for /addDevice (which uses machine name)
@@ -160,7 +172,9 @@ function Topbar({ filterOpen, setFilterOpen }) {
     "/status": "Devices",
     "/manageDevices": "Manage Devices",
     "/addDevice": (typeof mac === "string" && mac.length) ? "Edit Device" : "Add Device",
-    "/menu": "Menu",
+    "/manageMonitors": "Manage Monitors",
+    "/addMonitor": (typeof id === "string" && id.length) ? "Edit Monitor" : "Add Monitor",
+    "/menu": "Settings",
     "/notifications": "Notifications"
   }
 
@@ -203,7 +217,7 @@ function Topbar({ filterOpen, setFilterOpen }) {
       <Text style = {textStyle}>{title}</Text>
       </View>
 
-      {(title == "Devices") &&(
+      {(title == "Devices" || title == "Manage Devices") &&(
       <TouchableOpacity style = {topBarStyle} onPress={() => {setFilterOpen(!filterOpen)}}>
         <FilterIcon width = {28} height = {28} stroke="#FFFFFF"/>
       </TouchableOpacity>)}
@@ -278,9 +292,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   form: {
-    justifyContent: "space-evenly",
     paddingHorizontal: 20,
-    height: "100%"
+    paddingVertical: 30,
+    gap: 20,
   },
   pickerWrapper: {
     height: 45,
@@ -293,7 +307,8 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   menuTitle : {
-    fontSize: 30
+    fontSize: 30,
+    marginBottom: 10,
   },
   applyButton: {
     backgroundColor: "#2563EA",

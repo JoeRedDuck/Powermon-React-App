@@ -18,6 +18,12 @@ export default function Menu () {
           <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
         </View>
       </TouchableOpacity>
+      <TouchableOpacity onPress={() => router.push({pathname: "/apiSettings"})}>
+        <View style={styles.settings_container}>
+          <Text style={styles.optionText}>API Settings</Text>
+          <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
+        </View>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -32,7 +38,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     padding: 10,
     color: "#111827",
-    marginVertical: 2,
+    marginVertical: 5,
     alignItems: "center",
     justifyContent: "space-between",
     flexDirection: "row"
