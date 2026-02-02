@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime  # type: ignore
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON  # type: ignore
 from sqlalchemy.orm import relationship  # type: ignore
 from datetime import datetime
 from database import Base
@@ -48,3 +48,13 @@ class NotificationToken(Base):
     token = Column(String, unique=True, nullable=False)
     device_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class DeviceMutePreference(Base):
+    __tablename__ = "device_mute_preferences"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(String, unique=True, nullable=False, index=True)
+    muted_machines = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow,
+                        onupdate=datetime.utcnow)

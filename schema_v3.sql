@@ -29,3 +29,27 @@ CREATE TABLE IF NOT EXISTS notification_token (
   device_name VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS device_mute_preferences (
+  id SERIAL PRIMARY KEY,
+  device_id VARCHAR(255) NOT NULL UNIQUE,
+  muted_machines JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_mute_preferences_device_id ON device_mute_preferences(device_id);
+
+-- Trigger to automatically update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_device_mute_preferences_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_device_mute_preferences_updated_at
+    BEFORE UPDATE ON device_mute_preferences
+    FOR EACH ROW
+    EXECUTE FUNCTION update_device_mute_preferences_updated_at();

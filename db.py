@@ -289,51 +289,54 @@ def update_monitor(db: Session, monitor_id: int, monitor_data) -> tuple[bool, Op
             # Store old and new MAC addresses
             old_mac = monitor.mac
             new_mac = monitor_data.mac
-            
+
             from sqlalchemy import text
-            
+
             try:
                 # Get database dialect to handle SQLite vs PostgreSQL differently
                 dialect = db.bind.dialect.name
-                
+
                 # Expunge the monitor from the session to avoid tracking issues
                 db.expunge(monitor)
-                
+
                 if dialect == 'postgresql':
                     # PostgreSQL: Use deferred constraints
                     db.execute(text("SET CONSTRAINTS ALL DEFERRED"))
                 elif dialect == 'sqlite':
                     # SQLite: Disable FK checks temporarily
                     db.execute(text("PRAGMA foreign_keys = OFF"))
-                
+
                 # Update both ID and MAC using raw SQL if needed
                 if new_id != monitor_id:
                     # Update both ID and MAC
                     db.execute(
-                        text("UPDATE monitor SET monitor_id = :new_id, monitor_mac_address = :new_mac WHERE monitor_mac_address = :old_mac"),
+                        text(
+                            "UPDATE monitor SET monitor_id = :new_id, monitor_mac_address = :new_mac WHERE monitor_mac_address = :old_mac"),
                         {"new_id": new_id, "new_mac": new_mac, "old_mac": old_mac}
                     )
                 else:
                     # Update only MAC
                     db.execute(
-                        text("UPDATE monitor SET monitor_mac_address = :new_mac WHERE monitor_mac_address = :old_mac"),
+                        text(
+                            "UPDATE monitor SET monitor_mac_address = :new_mac WHERE monitor_mac_address = :old_mac"),
                         {"new_mac": new_mac, "old_mac": old_mac}
                     )
-                
+
                 # Update all polls that reference the old MAC
                 db.execute(
-                    text("UPDATE poll SET device_mac_address = :new_mac WHERE device_mac_address = :old_mac"),
+                    text(
+                        "UPDATE poll SET device_mac_address = :new_mac WHERE device_mac_address = :old_mac"),
                     {"new_mac": new_mac, "old_mac": old_mac}
                 )
-                
+
                 if dialect == 'sqlite':
                     # Re-enable FK checks
                     db.execute(text("PRAGMA foreign_keys = ON"))
-                
+
                 # Commit the changes
                 db.commit()
                 return (True, None)
-                
+
             except Exception as e:
                 db.rollback()
                 # Make sure to re-enable FK if we're on SQLite
@@ -344,11 +347,11 @@ def update_monitor(db: Session, monitor_id: int, monitor_data) -> tuple[bool, Op
                     except:
                         pass
                 return (False, f"Failed to update MAC address: {str(e)}")
-        
+
         # If we only updated ID (not MAC), commit normally
         if monitor_data.id is not None and monitor_data.id != monitor_id:
             monitor.id = monitor_data.id
-        
+
         db.commit()
         return (True, None)
     except IntegrityError as e:
@@ -631,6 +634,12 @@ def get_all_notification_tokens(db: Session) -> List[str]:
     return [t[0] for t in tokens]
 
 
+def get_notification_tokens_with_devices(db: Session) -> List[Dict[str, Optional[str]]]:
+    """Get all notification tokens with their device names/IDs."""
+    tokens = db.query(models.NotificationToken).all()
+    return [{"token": t.token, "device_name": t.device_name} for t in tokens]
+
+
 def delete_notification_token(db: Session, token: str) -> bool:
     """Delete a notification token. Returns True if deleted, False if not found."""
     token_obj = db.query(models.NotificationToken).filter(
@@ -641,3 +650,78 @@ def delete_notification_token(db: Session, token: str) -> bool:
         db.commit()
         return True
     return False
+
+
+# --- Device Mute Preferences ---
+
+def get_muted_machines(db: Session, device_id: str) -> List[str]:
+    """Get list of muted machines for a device. Returns empty list if none."""
+    preference = db.query(models.DeviceMutePreference).filter(
+        models.DeviceMutePreference.device_id == device_id).first()
+
+    if preference and preference.muted_machines:
+        return preference.muted_machines
+    return []
+
+
+def add_muted_machine(db: Session, device_id: str, machine_name: str) -> bool:
+    """Add a machine to device's muted list. Returns True if added, False if already muted."""
+    preference = db.query(models.DeviceMutePreference).filter(
+        models.DeviceMutePreference.device_id == device_id).first()
+
+    if preference:
+        # Check if already muted
+        if machine_name in preference.muted_machines:
+            return False
+        preference.muted_machines = preference.muted_machines + [machine_name]
+        preference.updated_at = datetime.utcnow()
+    else:
+        # Create new preference record
+        preference = models.DeviceMutePreference(
+            device_id=device_id,
+            muted_machines=[machine_name]
+        )
+        db.add(preference)
+
+    db.commit()
+    return True
+
+
+def remove_muted_machine(db: Session, device_id: str, machine_name: str) -> bool:
+    """Remove a machine from device's muted list. Returns True if removed, False if not found."""
+    preference = db.query(models.DeviceMutePreference).filter(
+        models.DeviceMutePreference.device_id == device_id).first()
+
+    if not preference or machine_name not in preference.muted_machines:
+        return False
+
+    preference.muted_machines = [
+        m for m in preference.muted_machines if m != machine_name]
+    preference.updated_at = datetime.utcnow()
+    db.commit()
+    return True
+
+
+def replace_muted_machines(db: Session, device_id: str, machine_names: List[str]) -> bool:
+    """Replace entire muted machines list for a device. Creates record if doesn't exist."""
+    preference = db.query(models.DeviceMutePreference).filter(
+        models.DeviceMutePreference.device_id == device_id).first()
+
+    if preference:
+        preference.muted_machines = machine_names
+        preference.updated_at = datetime.utcnow()
+    else:
+        preference = models.DeviceMutePreference(
+            device_id=device_id,
+            muted_machines=machine_names
+        )
+        db.add(preference)
+
+    db.commit()
+    return True
+
+
+def get_all_mute_preferences(db: Session) -> Dict[str, List[str]]:
+    """Get all device mute preferences as a dictionary {device_id: [muted_machines]}."""
+    preferences = db.query(models.DeviceMutePreference).all()
+    return {pref.device_id: pref.muted_machines for pref in preferences}

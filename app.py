@@ -98,6 +98,14 @@ class NotificationTokenCreate(BaseModel):
 
 class MonitorCreate(BaseModel):
     id: int
+
+
+class MutedMachineAdd(BaseModel):
+    machine_name: str
+
+
+class MutedMachineReplace(BaseModel):
+    machine_names: List[str]
     mac: str
     machine_name: Optional[str] = None
 
@@ -141,27 +149,50 @@ def get_device_status(device, low_threshold=50, stale_minutes=1):
     return "no power" if last_power == 0 else ("low power" if last_power < low_threshold else "online")
 
 
-def send_expo_notification(title: str, body: str, priority: str = "default"):
+def send_expo_notification(title: str, body: str, priority: str = "default", machine_names: Optional[List[str]] = None):
     """
     Send push notification to all registered Expo tokens.
     Priority: 'default', 'high' (for critical alerts)
+    machine_names: Optional list of machines this notification is about.
+                   If provided, will check device mute preferences.
     """
     with SessionLocal() as session:
-        tokens = db.get_all_notification_tokens(session)
-        if not tokens:
+        # Get tokens with device information
+        token_data = db.get_notification_tokens_with_devices(session)
+        if not token_data:
             print("No notification tokens registered")
             return
 
+        # Get all mute preferences if machine_names provided
+        mute_prefs = {}
+        if machine_names:
+            mute_prefs = db.get_all_mute_preferences(session)
+
         timestamp = datetime.now(timezone.utc).isoformat()
 
-        for token in tokens:
+        for token_info in token_data:
+            token = token_info["token"]
+            device_id = token_info["device_name"]
+
+            # Skip if this device has muted any of the machines in this notification
+            if machine_names and device_id:
+                muted_machines = mute_prefs.get(device_id, [])
+                # If any machine in the notification is muted by this device, skip
+                if any(machine in muted_machines for machine in machine_names):
+                    print(
+                        f"Skipping notification to device {device_id} (has muted machines)")
+                    continue
+
             message = {
                 "to": token,
                 "title": title,
                 "body": body,
                 "priority": priority,
                 "sound": "default",
-                "data": {"createdAt": timestamp}
+                "data": {
+                    "createdAt": timestamp,
+                    "machines": machine_names if machine_names else []
+                }
             }
 
             try:
@@ -212,20 +243,28 @@ async def alert_monitor(poll_sec=10, cooldown=300):
                 new_low = [d for d in low if d["name"] not in alerted_names]
                 new_none = [d for d in none if d["name"] not in alerted_names]
 
+                # Collect all affected machine names
+                affected_machines = []
+
                 if new_none:
                     messages.append(
                         "Power loss alert: " + (f"{new_none[0]['name']}" if len(new_none) == 1 else "Multiple devices"))
+                    affected_machines.extend([d["name"] for d in new_none])
                 if new_low:
                     messages.append(
                         "Low Power Alert: " + (f"{new_low[0]['name']}" if len(new_low) == 1 else "Multiple devices"))
+                    affected_machines.extend([d["name"] for d in new_low])
                 if new_off:
                     messages.append(
                         "Offline Alert: " + (f"{new_off[0]['name']}" if len(new_off) == 1 else "Multiple devices"))
+                    affected_machines.extend([d["name"] for d in new_off])
 
                 if messages:
                     title = "Machine Alert"
                     body = "\n".join(messages)
-                    send_expo_notification(title, body, priority="high")
+                    # Pass machine names to enable mute preferences filtering
+                    send_expo_notification(
+                        title, body, priority="high", machine_names=affected_machines)
                     alerted_devices.extend(new_off + new_low + new_none)
                     await asyncio.sleep(cooldown)
                 else:
@@ -693,6 +732,69 @@ def delete_notification_token(token: str, session: Session = Depends(get_db)):
         return {"status": "deleted"}
     else:
         raise HTTPException(status_code=404, detail={"status": "not_found"})
+
+
+# --- Device Mute Preferences Endpoints ---
+
+@app.get("/api/devices/{device_id}/muted-machines")
+def get_muted_machines(device_id: str, session: Session = Depends(get_db)):
+    """Get list of muted machines for a specific device."""
+    muted = db.get_muted_machines(session, device_id)
+    return {"device_id": device_id, "muted_machines": muted}
+
+
+@app.post("/api/devices/{device_id}/muted-machines")
+def add_muted_machine(device_id: str, data: MutedMachineAdd, session: Session = Depends(get_db)):
+    """Add a machine to device's muted list."""
+    # Verify machine exists
+    machine = session.query(models.Machine).filter(
+        models.Machine.name == data.machine_name).first()
+    if not machine:
+        raise HTTPException(
+            status_code=404,
+            detail={"status": "machine_not_found",
+                    "machine_name": data.machine_name}
+        )
+
+    if db.add_muted_machine(session, device_id, data.machine_name):
+        return {"status": "added", "device_id": device_id, "machine_name": data.machine_name}
+    else:
+        return {"status": "already_muted", "device_id": device_id, "machine_name": data.machine_name}
+
+
+@app.delete("/api/devices/{device_id}/muted-machines/{machine_name}")
+def remove_muted_machine(device_id: str, machine_name: str, session: Session = Depends(get_db)):
+    """Remove a machine from device's muted list."""
+    if db.remove_muted_machine(session, device_id, machine_name):
+        return {"status": "removed", "device_id": device_id, "machine_name": machine_name}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail={"status": "not_found",
+                    "message": "Machine not in muted list"}
+        )
+
+
+@app.put("/api/devices/{device_id}/muted-machines")
+def replace_muted_machines(device_id: str, data: MutedMachineReplace, session: Session = Depends(get_db)):
+    """Replace entire muted machines list for a device (bulk sync)."""
+    # Verify all machines exist
+    for machine_name in data.machine_names:
+        machine = session.query(models.Machine).filter(
+            models.Machine.name == machine_name).first()
+        if not machine:
+            raise HTTPException(
+                status_code=404,
+                detail={"status": "machine_not_found",
+                        "machine_name": machine_name}
+            )
+
+    db.replace_muted_machines(session, device_id, data.machine_names)
+    return {
+        "status": "replaced",
+        "device_id": device_id,
+        "muted_machines": data.machine_names
+    }
 
 
 if __name__ == "__main__":
