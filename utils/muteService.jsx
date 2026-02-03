@@ -10,7 +10,8 @@ export async function getMutedMachines() {
     const deviceId = await getDeviceId();
     const apiUrl = await getApiUrl();
     
-    const response = await fetch(`${apiUrl}/devices/${deviceId}/muted-machines`);
+    const url = `${apiUrl}/api/v1/muted-machines?device_id=${encodeURIComponent(deviceId)}`;
+    const response = await fetch(url);
     
     if (!response.ok) {
       // Try to use cached data if server request fails
@@ -19,7 +20,7 @@ export async function getMutedMachines() {
     }
     
     const data = await response.json();
-    const mutedMachines = data.mutedMachines || [];
+    const mutedMachines = data.machine_names || [];
     
     // Cache the result
     await AsyncStorage.setItem(MUTED_CACHE_KEY, JSON.stringify(mutedMachines));
@@ -43,10 +44,13 @@ export async function muteMachine(machineId) {
     const deviceId = await getDeviceId();
     const apiUrl = await getApiUrl();
     
-    const response = await fetch(`${apiUrl}/devices/${deviceId}/muted-machines`, {
+    const response = await fetch(`${apiUrl}/api/v1/muted-machines`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ machineId })
+      body: JSON.stringify({ 
+        device_id: deviceId,
+        machine_name: machineId 
+      })
     });
     
     if (!response.ok) throw new Error('Failed to mute machine');
@@ -71,10 +75,8 @@ export async function unmuteMachine(machineId) {
     const deviceId = await getDeviceId();
     const apiUrl = await getApiUrl();
     
-    const response = await fetch(
-      `${apiUrl}/devices/${deviceId}/muted-machines/${machineId}`,
-      { method: 'DELETE' }
-    );
+    const url = `${apiUrl}/api/v1/muted-machines?device_id=${encodeURIComponent(deviceId)}&machine_name=${encodeURIComponent(machineId)}`;
+    const response = await fetch(url, { method: 'DELETE' });
     
     if (!response.ok) throw new Error('Failed to unmute machine');
     
