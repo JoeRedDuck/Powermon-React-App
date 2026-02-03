@@ -20,7 +20,7 @@ export async function getMutedMachines() {
     }
     
     const data = await response.json();
-    const mutedMachines = data.machine_names || [];
+    const mutedMachines = data.muted_machines || [];
     
     // Cache the result
     await AsyncStorage.setItem(MUTED_CACHE_KEY, JSON.stringify(mutedMachines));

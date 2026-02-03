@@ -1,42 +1,41 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
-import { getMutedMachines, unmuteMachine } from "../utils/muteService.jsx";
+import { getMutedMachines, muteMachine, unmuteMachine } from "../utils/muteService.jsx";
 import useGetDevice from "../utils/getDevice.jsx";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 
-function MutedDeviceItem({ mac, onUnmute }) {
-  const device = useGetDevice(mac);
-  const [busy, setBusy] = useState(false);
-
-  const handleUnmute = async () => {
-    setBusy(true);
-    const success = await unmuteMachine(mac);
-    if (success) {
-      onUnmute(mac);
-    } else {
-      Alert.alert("Error", "Failed to unmute device");
-    }
-    setBusy(false);
-  };
-
+function DeviceToggleItem({ device, isMuted, onToggle, busy }) {
   return (
     <View style={styles.deviceCard}>
       <View style={styles.deviceInfo}>
         <View style={styles.deviceHeader}>
-          <Ionicons name="notifications-off" size={20} color="#EF4444" />
+          <Ionicons 
+            name={isMuted ? "notifications-off" : "notifications"} 
+            size={20} 
+            color={isMuted ? "#EF4444" : "#10B981"} 
+          />
           <Text style={styles.deviceName}>{device?.name || "Loading..."}</Text>
         </View>
-        <Text style={styles.deviceMac}>{mac}</Text>
+        <Text style={styles.deviceMac}>{device?.mac}</Text>
+        <Text style={styles.deviceLocation}>{device?.location || "No location"}</Text>
       </View>
       <TouchableOpacity 
-        style={[styles.unmuteButton, busy && styles.buttonDisabled]}
-        onPress={handleUnmute}
+        style={[
+          styles.toggleButton, 
+          isMuted ? styles.toggleButtonMuted : styles.toggleButtonActive,
+          busy && styles.buttonDisabled
+        ]}
+        onPress={() => onToggle(device.mac)}
         disabled={busy}
       >
         {busy ? (
-          <ActivityIndicator size="small" color="#2563EA" />
+          <ActivityIndicator size="small" color="#FFFFFF" />
         ) : (
-          <Text style={styles.unmuteButtonText}>Unmute</Text>
+          <Text style={styles.toggleButtonText}>
+            {isMuted ? "Unmute" : "Mute"}
+          </Text>
         )}
       </TouchableOpacity>
     </View>
@@ -44,58 +43,104 @@ function MutedDeviceItem({ mac, onUnmute }) {
 }
 
 export default function MutedDevices() {
+  const [allDevices, setAllDevices] = useState([]);
   const [mutedMacs, setMutedMacs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [busyMacs, setBusyMacs] = useState(new Set());
 
-  const loadMutedDevices = async () => {
+  const loadDevices = async () => {
     setLoading(true);
-    const muted = await getMutedMachines();
-    setMutedMacs(muted);
-    setLoading(false);
+    try {
+      // Fetch all devices
+      const apiBase = process.env.EXPO_PUBLIC_API_BASE || Constants.expoConfig?.extra?.apiBase || '';
+      const url = `${apiBase.replace(/\/$/, '')}/api/v1/status`;
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAllDevices(data || []);
+      }
+      
+      // Fetch muted machines
+      const muted = await getMutedMachines();
+      setMutedMacs(muted);
+    } catch (error) {
+      console.error('Failed to load devices:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadMutedDevices();
+    loadDevices();
   }, []);
 
-  const handleUnmute = (mac) => {
-    setMutedMacs(prev => prev.filter(m => m !== mac));
+  const handleToggle = async (mac) => {
+    if (busyMacs.has(mac)) return;
+    
+    setBusyMacs(prev => new Set(prev).add(mac));
+    
+    try {
+      const isMuted = mutedMacs.includes(mac);
+      
+      if (isMuted) {
+        const success = await unmuteMachine(mac);
+        if (success) {
+          setMutedMacs(prev => prev.filter(m => m !== mac));
+        }
+      } else {
+        const success = await muteMachine(mac);
+        if (success) {
+          setMutedMacs(prev => [...prev, mac]);
+        }
+      }
+    } finally {
+      setBusyMacs(prev => {
+        const next = new Set(prev);
+        next.delete(mac);
+        return next;
+      });
+    }
   };
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#2563EA" />
-        <Text style={styles.loadingText}>Loading muted devices...</Text>
+        <Text style={styles.loadingText}>Loading devices...</Text>
       </View>
     );
   }
 
-  if (mutedMacs.length === 0) {
+  if (allDevices.length === 0) {
     return (
       <View style={styles.centerContainer}>
         <Ionicons name="notifications" size={64} color="#D1D5DB" />
-        <Text style={styles.emptyTitle}>No Muted Devices</Text>
+        <Text style={styles.emptyTitle}>No Devices Found</Text>
         <Text style={styles.emptyText}>
-          You haven't muted any device alerts
+          Add some devices to manage alerts
         </Text>
       </View>
     );
   }
+
+  const mutedCount = mutedMacs.length;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>
-          {mutedMacs.length} {mutedMacs.length === 1 ? "device" : "devices"} muted
+          {mutedCount} of {allDevices.length} {allDevices.length === 1 ? "device" : "devices"} muted
         </Text>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {mutedMacs.map((mac) => (
-          <MutedDeviceItem 
-            key={mac} 
-            mac={mac} 
-            onUnmute={handleUnmute}
+        {allDevices.map((device) => (
+          <DeviceToggleItem 
+            key={device.mac} 
+            device={device}
+            isMuted={mutedMacs.includes(device.mac)}
+            onToggle={handleToggle}
+            busy={busyMacs.has(device.mac)}
           />
         ))}
       </ScrollView>
@@ -156,24 +201,36 @@ const styles = StyleSheet.create({
     color: "#111827"
   },
   deviceMac: {
-    fontSize: 14,
+    fontSize: 13,
     color: "#6B7280"
   },
-  unmuteButton: {
-    backgroundColor: "#EFF6FF",
+  deviceLocation: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    fontStyle: "italic"
+  },
+  toggleButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#2563EA",
     minWidth: 80,
     alignItems: "center"
+  },
+  toggleButtonActive: {
+    backgroundColor: "#EF4444",
+    borderWidth: 1,
+    borderColor: "#DC2626"
+  },
+  toggleButtonMuted: {
+    backgroundColor: "#10B981",
+    borderWidth: 1,
+    borderColor: "#059669"
   },
   buttonDisabled: {
     opacity: 0.5
   },
-  unmuteButtonText: {
-    color: "#2563EA",
+  toggleButtonText: {
+    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600"
   },

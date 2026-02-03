@@ -2,14 +2,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { VictoryAxis, VictoryChart, VictoryLine } from "victory-native";
 import GraphDropdown from "../components/graphDropdown.jsx";
 import StatusPill from "../components/StatusPill";
 import useGetDevice from "../utils/getDevice.jsx";
-import { isMachineMuted, muteMachine, unmuteMachine } from "../utils/muteService.jsx";
-import { Ionicons } from '@expo/vector-icons';
 
 export default function Device () {
   const {mac} = useLocalSearchParams();
@@ -23,8 +21,6 @@ export default function Device () {
   const [min, setMin] = useState("-")
   const [max, setMax] = useState("-")
   const [average, setAverage] = useState("-")
-  const [isMuted, setIsMuted] = useState(false);
-  const [muteBusy, setMuteBusy] = useState(false);
   const TIME_OPTIONS = [
       {label: "Last 5 minutes", value: "5m", bucket: "10s"},
       {label: "Last 10 minutes", value: "10m", bucket: "10s"},
@@ -51,38 +47,6 @@ export default function Device () {
       }
     });
   }, []);
-
-  useEffect(() => {
-    if (mac) {
-      isMachineMuted(mac).then(setIsMuted);
-    }
-  }, [mac]);
-
-  const handleMuteToggle = async () => {
-    if (muteBusy || !mac) return;
-    setMuteBusy(true);
-    try {
-      if (isMuted) {
-        const success = await unmuteMachine(mac);
-        if (success) {
-          setIsMuted(false);
-          Alert.alert("Success", "Notifications unmuted for this device");
-        } else {
-          Alert.alert("Error", "Failed to unmute device");
-        }
-      } else {
-        const success = await muteMachine(mac);
-        if (success) {
-          setIsMuted(true);
-          Alert.alert("Success", "Notifications muted for this device");
-        } else {
-          Alert.alert("Error", "Failed to mute device");
-        }
-      }
-    } finally {
-      setMuteBusy(false);
-    }
-  };
 
   useEffect(() => {
   if (typeof mac !== "string" || mac.length === 0) return;
@@ -131,27 +95,6 @@ export default function Device () {
             <StatusPill status={device?.status}/>
           </View>
           <Text style={styles.mac}>{device?.mac}</Text>
-          <View style={styles.line}></View>
-          <TouchableOpacity 
-            style={[styles.muteButton, isMuted && styles.muteButtonActive]}
-            onPress={handleMuteToggle}
-            disabled={muteBusy}
-          >
-            {muteBusy ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons 
-                  name={isMuted ? "notifications-off" : "notifications"} 
-                  size={18} 
-                  color="#FFFFFF" 
-                />
-                <Text style={styles.muteButtonText}>
-                  {isMuted ? "Unmute Alerts" : "Mute Alerts"}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
           <View style={styles.line}></View>
           <View style={styles.row}>
             <Text style={styles.label}>Current Power:</Text>
@@ -332,25 +275,6 @@ const styles = StyleSheet.create({
   content: {
     gap: 10,
     paddingVertical: 10
-  },
-  muteButton: {
-    backgroundColor: "#6B7280",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 10
-  },
-  muteButtonActive: {
-    backgroundColor: "#EF4444"
-  },
-  muteButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600"
   },
 }); 
 
