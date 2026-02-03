@@ -101,19 +101,13 @@ class MonitorCreate(BaseModel):
 
 
 class MutedMachineAdd(BaseModel):
+    device_id: str
     machine_name: str
 
 
 class MutedMachineReplace(BaseModel):
+    device_id: str
     machine_names: List[str]
-    mac: str
-    machine_name: Optional[str] = None
-
-    @validator('mac')
-    def validate_mac(cls, v):
-        if not v or not v.strip():
-            raise ValueError('MAC address cannot be empty')
-        return v.strip()
 
 
 class MonitorUpdate(BaseModel):
@@ -736,15 +730,15 @@ def delete_notification_token(token: str, session: Session = Depends(get_db)):
 
 # --- Device Mute Preferences Endpoints ---
 
-@app.get("/api/devices/{device_id}/muted-machines")
-def get_muted_machines(device_id: str, session: Session = Depends(get_db)):
+@app.get("/api/v1/muted-machines")
+def get_muted_machines(device_id: str = Query(..., description="Device identifier"), session: Session = Depends(get_db)):
     """Get list of muted machines for a specific device."""
     muted = db.get_muted_machines(session, device_id)
     return {"device_id": device_id, "muted_machines": muted}
 
 
-@app.post("/api/devices/{device_id}/muted-machines")
-def add_muted_machine(device_id: str, data: MutedMachineAdd, session: Session = Depends(get_db)):
+@app.post("/api/v1/muted-machines")
+def add_muted_machine(data: MutedMachineAdd, session: Session = Depends(get_db)):
     """Add a machine to device's muted list."""
     # Verify machine exists
     machine = session.query(models.Machine).filter(
@@ -756,14 +750,14 @@ def add_muted_machine(device_id: str, data: MutedMachineAdd, session: Session = 
                     "machine_name": data.machine_name}
         )
 
-    if db.add_muted_machine(session, device_id, data.machine_name):
-        return {"status": "added", "device_id": device_id, "machine_name": data.machine_name}
+    if db.add_muted_machine(session, data.device_id, data.machine_name):
+        return {"status": "added", "device_id": data.device_id, "machine_name": data.machine_name}
     else:
-        return {"status": "already_muted", "device_id": device_id, "machine_name": data.machine_name}
+        return {"status": "already_muted", "device_id": data.device_id, "machine_name": data.machine_name}
 
 
-@app.delete("/api/devices/{device_id}/muted-machines/{machine_name}")
-def remove_muted_machine(device_id: str, machine_name: str, session: Session = Depends(get_db)):
+@app.delete("/api/v1/muted-machines")
+def remove_muted_machine(device_id: str = Query(..., description="Device identifier"), machine_name: str = Query(..., description="Machine name"), session: Session = Depends(get_db)):
     """Remove a machine from device's muted list."""
     if db.remove_muted_machine(session, device_id, machine_name):
         return {"status": "removed", "device_id": device_id, "machine_name": machine_name}
@@ -775,8 +769,8 @@ def remove_muted_machine(device_id: str, machine_name: str, session: Session = D
         )
 
 
-@app.put("/api/devices/{device_id}/muted-machines")
-def replace_muted_machines(device_id: str, data: MutedMachineReplace, session: Session = Depends(get_db)):
+@app.put("/api/v1/muted-machines")
+def replace_muted_machines(data: MutedMachineReplace, session: Session = Depends(get_db)):
     """Replace entire muted machines list for a device (bulk sync)."""
     # Verify all machines exist
     for machine_name in data.machine_names:
@@ -789,10 +783,10 @@ def replace_muted_machines(device_id: str, data: MutedMachineReplace, session: S
                         "machine_name": machine_name}
             )
 
-    db.replace_muted_machines(session, device_id, data.machine_names)
+    db.replace_muted_machines(session, data.device_id, data.machine_names)
     return {
         "status": "replaced",
-        "device_id": device_id,
+        "device_id": data.device_id,
         "muted_machines": data.machine_names
     }
 

@@ -21,7 +21,9 @@ def test_mute_preferences():
     # Test 1: Get muted machines (should be empty initially)
     print("1. Getting initial muted machines list...")
     response = requests.get(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines")
+        f"{BASE_URL}/api/v1/muted-machines",
+        params={"device_id": device_id}
+    )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
     assert response.status_code == 200
@@ -31,8 +33,8 @@ def test_mute_preferences():
     # Test 2: Add a machine to muted list
     print("2. Adding a machine to muted list...")
     response = requests.post(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines",
-        json={"machine_name": machine_name}
+        f"{BASE_URL}/api/v1/muted-machines",
+        json={"device_id": device_id, "machine_name": machine_name}
     )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
@@ -43,7 +45,9 @@ def test_mute_preferences():
     # Test 3: Get muted machines (should contain the added machine)
     print("3. Getting muted machines list after adding...")
     response = requests.get(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines")
+        f"{BASE_URL}/api/v1/muted-machines",
+        params={"device_id": device_id}
+    )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
     assert response.status_code == 200
@@ -53,8 +57,8 @@ def test_mute_preferences():
     # Test 4: Try to add the same machine again (should return already_muted)
     print("4. Trying to add the same machine again...")
     response = requests.post(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines",
-        json={"machine_name": machine_name}
+        f"{BASE_URL}/api/v1/muted-machines",
+        json={"device_id": device_id, "machine_name": machine_name}
     )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
@@ -66,8 +70,8 @@ def test_mute_preferences():
     machine_name2 = "Machine_B"
     print("5. Adding a second machine to muted list...")
     response = requests.post(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines",
-        json={"machine_name": machine_name2}
+        f"{BASE_URL}/api/v1/muted-machines",
+        json={"device_id": device_id, "machine_name": machine_name2}
     )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
@@ -77,7 +81,8 @@ def test_mute_preferences():
     # Test 6: Remove a machine from muted list
     print("6. Removing a machine from muted list...")
     response = requests.delete(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines/{machine_name}"
+        f"{BASE_URL}/api/v1/muted-machines",
+        params={"device_id": device_id, "machine_name": machine_name}
     )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
@@ -88,7 +93,9 @@ def test_mute_preferences():
     # Test 7: Verify machine was removed
     print("7. Verifying machine was removed...")
     response = requests.get(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines")
+        f"{BASE_URL}/api/v1/muted-machines",
+        params={"device_id": device_id}
+    )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
     assert machine_name not in response.json()["muted_machines"]
@@ -99,8 +106,8 @@ def test_mute_preferences():
     print("8. Replacing entire muted list...")
     new_machines = ["Machine_C", "Machine_D", "Machine_E"]
     response = requests.put(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines",
-        json={"machine_names": new_machines}
+        f"{BASE_URL}/api/v1/muted-machines",
+        json={"device_id": device_id, "machine_names": new_machines}
     )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
@@ -111,7 +118,9 @@ def test_mute_preferences():
     # Test 9: Verify the replacement
     print("9. Verifying the replacement...")
     response = requests.get(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines")
+        f"{BASE_URL}/api/v1/muted-machines",
+        params={"device_id": device_id}
+    )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
     assert set(response.json()["muted_machines"]) == set(new_machines)
@@ -120,7 +129,8 @@ def test_mute_preferences():
     # Test 10: Try to remove a machine that's not in the list
     print("10. Trying to remove a non-existent machine...")
     response = requests.delete(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines/NonExistent"
+        f"{BASE_URL}/api/v1/muted-machines",
+        params={"device_id": device_id, "machine_name": "NonExistent"}
     )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
@@ -131,8 +141,8 @@ def test_mute_preferences():
     device_id2 = "test_device_002"
     print(f"11. Testing with a different device ({device_id2})...")
     response = requests.post(
-        f"{BASE_URL}/api/devices/{device_id2}/muted-machines",
-        json={"machine_name": machine_name}
+        f"{BASE_URL}/api/v1/muted-machines",
+        json={"device_id": device_id2, "machine_name": machine_name}
     )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
@@ -142,8 +152,8 @@ def test_mute_preferences():
     # Test 12: Clear the list for cleanup
     print("12. Clearing muted list for cleanup...")
     response = requests.put(
-        f"{BASE_URL}/api/devices/{device_id}/muted-machines",
-        json={"machine_names": []}
+        f"{BASE_URL}/api/v1/muted-machines",
+        json={"device_id": device_id, "machine_names": []}
     )
     print(f"   Status: {response.status_code}")
     print(f"   Response: {response.json()}")
