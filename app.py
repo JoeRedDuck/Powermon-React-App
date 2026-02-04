@@ -67,8 +67,9 @@ class DeviceCreate(BaseModel):
     
     @validator('mac')
     def mac_not_empty_if_provided(cls, v):
-        if v is not None and (not v or not v.strip()):
-            raise ValueError('MAC address cannot be empty string (use null instead)')
+        # Treat empty strings as None (not provided)
+        if v is not None and not v.strip():
+            return None
         return v.strip() if v else None
     
     @root_validator

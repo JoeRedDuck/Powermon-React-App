@@ -313,17 +313,25 @@ def test_multiple_machines_without_monitors(client):
         assert machine["id"] is None
 
 
-def test_empty_string_mac_rejected(client):
-    """Test that empty string MAC address is rejected"""
+def test_empty_string_mac_accepted(client):
+    """Test that empty string MAC address is treated as None (no monitor)"""
     response = client.post("/api/v1/devices", json={
         "name": "Machine With Empty MAC",
-        "mac": "",  # Empty string
+        "mac": "",  # Empty string - should be treated as no monitor
         "machine_type": "Test",
         "location": "Lab"
     })
     
-    assert response.status_code == 422
-    # Pydantic validation should reject this
+    assert response.status_code == 200
+    assert response.json()["status"] == "created"
+    
+    # Verify the device was created without a monitor
+    devices = client.get("/api/v1/devices").json()
+    device = next((d for d in devices if d["name"] == "Machine With Empty MAC"), None)
+    
+    assert device is not None
+    assert device["mac"] is None
+    assert device["id"] is None
 
 
 def test_update_machine_properties_without_monitor(client):
