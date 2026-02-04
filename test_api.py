@@ -200,7 +200,7 @@ def test_duplicate_device_prevention(client):
     # Try to create duplicate
     duplicate_res = create_dummy_device(client, mac=mac, name="Device 2")
     assert duplicate_res.status_code == 400
-    assert duplicate_res.json()["detail"]["status"] == "duplicate"
+    assert duplicate_res.json()["detail"]["status"] == "error"
 
 
 def test_health_endpoint(client):

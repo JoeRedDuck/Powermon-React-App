@@ -40,7 +40,8 @@ def test_add_and_get_device(db_session):
     data = MockDeviceData("Lathe 1", "AA:BB:CC", "Shop", "Lathe")
 
     # 1. Add Device
-    assert db_service.add_device(db_session, data) is True
+    success, error = db_service.add_device(db_session, data)
+    assert success is True
 
     # 2. Check if MACHINE was created correctly
     machine = db_session.query(
@@ -69,10 +70,13 @@ def test_duplicate_device_prevention(db_session):
     data = MockDeviceData("Lathe 1", "AA:BB:CC", "Shop", "Lathe")
 
     # Add first device
-    assert db_service.add_device(db_session, data) is True
+    success, error = db_service.add_device(db_session, data)
+    assert success is True
 
     # Try to add same MAC again - should return False
-    assert db_service.add_device(db_session, data) is False
+    success, error = db_service.add_device(db_session, data)
+    assert success is False
+    assert "already exists" in error.lower()
 
 
 def test_latest_poll_logic(db_session):

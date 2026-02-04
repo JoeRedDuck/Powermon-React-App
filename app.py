@@ -68,14 +68,14 @@ class DeviceCreate(BaseModel):
         if not v or not v.strip():
             raise ValueError('Field cannot be empty')
         return v.strip()
-    
+
     @validator('mac')
     def mac_not_empty_if_provided(cls, v):
         # Treat empty strings as None (not provided)
         if v is not None and not v.strip():
             return None
         return v.strip() if v else None
-    
+
     @root_validator(skip_on_failure=True)
     def validate_monitor_info(cls, values):
         # If mac is provided, it's okay (with or without id)
@@ -89,7 +89,8 @@ class DeviceUpdate(BaseModel):
     id: Optional[int] = None
     location: str | None = None
     machine_type: str | None = None
-    reassign_monitor_id: Optional[int] = None  # New field for reassigning monitors
+    # New field for reassigning monitors
+    reassign_monitor_id: Optional[int] = None
 
     @validator('name')
     def not_empty(cls, v):
@@ -580,13 +581,15 @@ def edit_device(mac: str, device: DeviceUpdate, session: Session = Depends(get_d
                     "message": f"Monitor with id {device.reassign_monitor_id} not found"
                 }
             )
-        
+
         # After reassignment, get the new MAC address
-        monitor = session.query(models.Monitor).filter(models.Monitor.id == device.reassign_monitor_id).first()
+        monitor = session.query(models.Monitor).filter(
+            models.Monitor.id == device.reassign_monitor_id).first()
         if monitor:
             mac = monitor.mac  # Update mac to the new monitor's MAC
         else:
-            raise HTTPException(status_code=500, detail={"status": "error", "message": "Monitor reassignment succeeded but could not retrieve new MAC"})
+            raise HTTPException(status_code=500, detail={
+                                "status": "error", "message": "Monitor reassignment succeeded but could not retrieve new MAC"})
 
     # Update only the allowed fields (name, location, machine_type)
     if db.update_device(session, mac, device):
@@ -694,10 +697,14 @@ def reassign_monitor_endpoint(monitor_id: int, machine_name: str = Query(...), s
 
 @app.post("/api/v1/devices")
 def create_device(device: DeviceCreate, session: Session = Depends(get_db)):
-    if db.add_device(session, device):
+    success, error_msg = db.add_device(session, device)
+    if success:
         return {"status": "created", "device": device.dict()}
-    raise HTTPException(status_code=400, detail={
-                        "status": "duplicate", "reason": "Already exists"})
+    
+    # Determine appropriate status code based on error
+    status_code = 404 if "not found" in error_msg.lower() else 400
+    raise HTTPException(status_code=status_code, detail={
+                        "status": "error", "reason": error_msg})
 
 
 @app.post("/api/v1/checkPoll/{mac}")

@@ -515,7 +515,7 @@ def update_device(db: Session, mac: str, device_data) -> bool:
     return True
 
 
-def add_device(db: Session, device_data) -> bool:
+def add_device(db: Session, device_data) -> tuple[bool, str]:
     """
     Add a device (machine) with optional monitor attachment.
 
@@ -525,8 +525,9 @@ def add_device(db: Session, device_data) -> bool:
     3. Neither provided: Create NEW machine without monitor (fails if machine name exists)
 
     Returns:
-        True if successful
-        False if:
+        Tuple of (success: bool, error_message: str)
+        success=True if successful, error_message="" 
+        success=False with specific error message if:
           - MAC is provided and already exists
           - Monitor ID not found
           - Neither MAC nor ID provided AND machine name already exists
@@ -540,7 +541,7 @@ def add_device(db: Session, device_data) -> bool:
     if not device_data.mac and device_data.id is None:
         if machine:
             # Machine already exists and we're not attaching a monitor - reject as duplicate
-            return False
+            return False, f"Machine '{device_data.name}' already exists"
         # Create new machine without monitor
         machine = models.Machine(
             name=device_data.name,
@@ -549,7 +550,7 @@ def add_device(db: Session, device_data) -> bool:
         )
         db.add(machine)
         db.commit()
-        return True
+        return True, ""
     
     # For scenarios 1 & 2 (monitor involved), create or update machine
     if not machine:
@@ -573,7 +574,7 @@ def add_device(db: Session, device_data) -> bool:
         # Check if monitor with this MAC already exists
         if db.query(models.Monitor).filter(models.Monitor.mac == device_data.mac).first():
             db.rollback()
-            return False
+            return False, f"Monitor with MAC address '{device_data.mac}' already exists"
 
         # Create new monitor and attach to machine
         db.add(models.Monitor(
@@ -590,7 +591,7 @@ def add_device(db: Session, device_data) -> bool:
 
         if not monitor:
             db.rollback()
-            return False
+            return False, f"Monitor with ID {device_data.id} not found"
 
         # If the monitor is already assigned to another machine, unassign previous monitor on target machine
         if monitor.machine_name and monitor.machine_name != device_data.name:
@@ -609,7 +610,7 @@ def add_device(db: Session, device_data) -> bool:
         monitor.machine_name = device_data.name
 
     db.commit()
-    return True
+    return True, ""
 
 
 def insert_poll(db: Session, monitor_mac: str, power_usage: int, poll_time: datetime) -> bool:
