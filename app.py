@@ -14,7 +14,7 @@ from dateutil import parser
 from dotenv import load_dotenv  # type: ignore
 from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
-from pydantic import BaseModel, validator  # type: ignore
+from pydantic import BaseModel, validator, root_validator  # type: ignore
 from sqlalchemy.orm import Session  # type: ignore
 from sqlalchemy import text  # type: ignore
 import urllib3  # type: ignore
@@ -55,15 +55,31 @@ UPS_OUTAGE = asyncio.Event()
 class DeviceCreate(BaseModel):
     name: str
     id: Optional[int] = None
-    mac: str
+    mac: Optional[str] = None
     machine_type: str
     location: str
 
-    @validator('name', 'mac', 'machine_type', 'location')
+    @validator('name', 'machine_type', 'location')
     def not_empty(cls, v):
         if not v or not v.strip():
             raise ValueError('Field cannot be empty')
         return v.strip()
+    
+    @validator('mac')
+    def mac_not_empty_if_provided(cls, v):
+        if v is not None and (not v or not v.strip()):
+            raise ValueError('MAC address cannot be empty string (use null instead)')
+        return v.strip() if v else None
+    
+    @root_validator
+    def validate_monitor_info(cls, values):
+        mac = values.get('mac')
+        monitor_id = values.get('id')
+        
+        # If mac is provided, it's okay (with or without id)
+        # If mac is not provided, monitor_id can be provided or both can be None
+        # No validation error needed - all combinations are valid
+        return values
 
 
 class DeviceUpdate(BaseModel):
@@ -71,6 +87,7 @@ class DeviceUpdate(BaseModel):
     id: Optional[int] = None
     location: str | None = None
     machine_type: str | None = None
+    reassign_monitor_id: Optional[int] = None  # New field for reassigning monitors
 
     @validator('name')
     def not_empty(cls, v):
@@ -98,6 +115,8 @@ class NotificationTokenCreate(BaseModel):
 
 class MonitorCreate(BaseModel):
     id: int
+    mac: str
+    machine_name: Optional[str] = None
 
 
 class MutedMachineAdd(BaseModel):
@@ -537,15 +556,35 @@ def edit_device(mac: str, device: DeviceUpdate, session: Session = Depends(get_d
     if not current_device:
         raise HTTPException(status_code=404, detail={"status": "not_found"})
 
-    # If ID is being changed, reject with helpful error message
-    if device.id is not None and device.id != current_device.get("id"):
+    machine_name = current_device.get("name")
+
+    # If ID is being changed (but not using reassign_monitor_id), reject with helpful error message
+    if device.id is not None and device.id != current_device.get("id") and device.reassign_monitor_id is None:
         raise HTTPException(
             status_code=400,
             detail={
                 "status": "error",
-                "message": "Monitor ID cannot be changed via edit. Use POST /api/v1/monitors/{monitor_id}/reassign?machine_name=<machine_name> to reassign monitors."
+                "message": "Monitor ID cannot be changed via edit. Use POST /api/v1/monitors/{monitor_id}/reassign?machine_name=<machine_name> to reassign monitors, or use reassign_monitor_id field."
             }
         )
+
+    # Handle monitor reassignment if requested
+    if device.reassign_monitor_id is not None:
+        if not db.reassign_monitor(session, device.reassign_monitor_id, machine_name):
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "status": "error",
+                    "message": f"Monitor with id {device.reassign_monitor_id} not found"
+                }
+            )
+        
+        # After reassignment, get the new MAC address
+        monitor = session.query(models.Monitor).filter(models.Monitor.id == device.reassign_monitor_id).first()
+        if monitor:
+            mac = monitor.mac  # Update mac to the new monitor's MAC
+        else:
+            raise HTTPException(status_code=500, detail={"status": "error", "message": "Monitor reassignment succeeded but could not retrieve new MAC"})
 
     # Update only the allowed fields (name, location, machine_type)
     if db.update_device(session, mac, device):
