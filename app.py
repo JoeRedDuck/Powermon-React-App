@@ -76,6 +76,12 @@ class DeviceCreate(BaseModel):
             return None
         return v.strip() if v else None
 
+    @validator('id')
+    def validate_monitor_id(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError('Monitor ID must be a positive integer')
+        return v
+
     @root_validator(skip_on_failure=True)
     def validate_monitor_info(cls, values):
         # If mac is provided, it's okay (with or without id)

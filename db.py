@@ -541,6 +541,7 @@ def add_device(db: Session, device_data) -> tuple[bool, str]:
     if not device_data.mac and device_data.id is None:
         if machine:
             # Machine already exists and we're not attaching a monitor - reject as duplicate
+            db.rollback()
             return False, f"Machine '{device_data.name}' already exists"
         # Create new machine without monitor
         machine = models.Machine(
@@ -592,6 +593,11 @@ def add_device(db: Session, device_data) -> tuple[bool, str]:
         if not monitor:
             db.rollback()
             return False, f"Monitor with ID {device_data.id} not found"
+
+        # If monitor is already assigned to this machine, we're done (avoid redundant reassignment)
+        if monitor.machine_name == device_data.name:
+            db.commit()
+            return True, ""
 
         # If the monitor is already assigned to another machine, unassign previous monitor on target machine
         if monitor.machine_name and monitor.machine_name != device_data.name:
