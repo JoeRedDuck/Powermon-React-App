@@ -14,7 +14,11 @@ from dateutil import parser
 from dotenv import load_dotenv  # type: ignore
 from fastapi import FastAPI, HTTPException, Query, Depends  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
-from pydantic import BaseModel, validator, root_validator  # type: ignore
+from pydantic import BaseModel, validator  # type: ignore
+try:
+    from pydantic import root_validator
+except ImportError:
+    from pydantic import model_validator as root_validator
 from sqlalchemy.orm import Session  # type: ignore
 from sqlalchemy import text  # type: ignore
 import urllib3  # type: ignore
@@ -72,11 +76,8 @@ class DeviceCreate(BaseModel):
             return None
         return v.strip() if v else None
     
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def validate_monitor_info(cls, values):
-        mac = values.get('mac')
-        monitor_id = values.get('id')
-        
         # If mac is provided, it's okay (with or without id)
         # If mac is not provided, monitor_id can be provided or both can be None
         # No validation error needed - all combinations are valid
