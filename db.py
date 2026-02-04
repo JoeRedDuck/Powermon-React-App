@@ -518,20 +518,40 @@ def update_device(db: Session, mac: str, device_data) -> bool:
 def add_device(db: Session, device_data) -> bool:
     """
     Add a device (machine) with optional monitor attachment.
-    
+
     Three scenarios:
-    1. MAC provided: Create new monitor and attach to machine
-    2. Monitor ID provided (no MAC): Attach existing monitor to machine
-    3. Neither provided: Create machine without monitor
-    
+    1. MAC provided: Create new monitor and attach to machine (machine can be new or existing)
+    2. Monitor ID provided (no MAC): Attach existing monitor to machine (machine can be new or existing)
+    3. Neither provided: Create NEW machine without monitor (fails if machine name exists)
+
     Returns:
         True if successful
-        False if MAC is provided and already exists, or if monitor ID not found
+        False if:
+          - MAC is provided and already exists
+          - Monitor ID not found
+          - Neither MAC nor ID provided AND machine name already exists
     """
-    
-    # 1. Ensure Machine exists - create or update
+
+    # 1. Check if Machine exists
     machine = db.query(models.Machine).filter(
         models.Machine.name == device_data.name).first()
+    
+    # If no monitor info provided (scenario 3), machine name must be unique
+    if not device_data.mac and device_data.id is None:
+        if machine:
+            # Machine already exists and we're not attaching a monitor - reject as duplicate
+            return False
+        # Create new machine without monitor
+        machine = models.Machine(
+            name=device_data.name,
+            type=device_data.machine_type,
+            location=device_data.location
+        )
+        db.add(machine)
+        db.commit()
+        return True
+    
+    # For scenarios 1 & 2 (monitor involved), create or update machine
     if not machine:
         # Create new machine
         machine = models.Machine(
@@ -554,7 +574,7 @@ def add_device(db: Session, device_data) -> bool:
         if db.query(models.Monitor).filter(models.Monitor.mac == device_data.mac).first():
             db.rollback()
             return False
-        
+
         # Create new monitor and attach to machine
         db.add(models.Monitor(
             mac=device_data.mac,
@@ -565,12 +585,13 @@ def add_device(db: Session, device_data) -> bool:
     elif device_data.id is not None:
         # Scenario 2: Monitor ID provided without MAC - attach existing monitor
         # Find the monitor by ID (could be assigned or unassigned)
-        monitor = db.query(models.Monitor).filter(models.Monitor.id == device_data.id).first()
-        
+        monitor = db.query(models.Monitor).filter(
+            models.Monitor.id == device_data.id).first()
+
         if not monitor:
             db.rollback()
             return False
-        
+
         # If the monitor is already assigned to another machine, unassign previous monitor on target machine
         if monitor.machine_name and monitor.machine_name != device_data.name:
             # Monitor is moving from another machine - handle it like reassignment
@@ -578,17 +599,15 @@ def add_device(db: Session, device_data) -> bool:
             existing_monitors = db.query(models.Monitor).filter(
                 models.Monitor.machine_name == device_data.name
             ).all()
-            
+
             # Unassign any existing monitors on the target machine
             for existing_monitor in existing_monitors:
                 if existing_monitor.mac != monitor.mac:
                     existing_monitor.machine_name = None
-        
+
         # Assign the monitor to this machine
         monitor.machine_name = device_data.name
-    
-    # Scenario 3: Neither MAC nor ID provided - just create/update the machine (already done above)
-    
+
     db.commit()
     return True
 
