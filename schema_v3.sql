@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS machine (
 CREATE TABLE IF NOT EXISTS monitor (
   monitor_mac_address VARCHAR(255) PRIMARY KEY,
   monitor_id INT,
-  monitor_ip VARCHAR(255),
   type VARCHAR(255),
   machine_name VARCHAR(255),
   FOREIGN KEY (machine_name) REFERENCES machine(machine_name)

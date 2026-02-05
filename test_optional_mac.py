@@ -13,7 +13,7 @@ from database import Base, get_db
 from app import app
 import models
 
-# Test database setup
+# Test database setup - Use file-based test DB (cleaned before each test)
 TEST_DB = "sqlite:///./test_optional_mac.db"
 engine = create_engine(TEST_DB, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(

@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-Test script to verify machine renaming works correctly on PostgreSQL.
-This addresses the FK constraint issues that SQLite tests don't catch.
+⚠️  DANGEROUS: This test uses the PRODUCTION PostgreSQL database!
+
+This script is for manual testing only and should NOT be run with pytest.
+It verifies machine renaming works correctly on PostgreSQL.
+
+To run safely:
+1. Set TEST_PRODUCTION_DB=true environment variable
+2. Run directly: python3 test_pg_machine_rename.py
+3. DO NOT include in pytest runs
 """
 import os
 import sys
@@ -9,6 +16,13 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import models
 import db as db_service
+
+# SAFETY CHECK: Prevent accidental execution
+if not os.getenv('TEST_PRODUCTION_DB') == 'true':
+    print("❌ ERROR: This test uses the PRODUCTION database!")
+    print("To run this test, set: TEST_PRODUCTION_DB=true")
+    print("Example: TEST_PRODUCTION_DB=true python3 test_pg_machine_rename.py")
+    sys.exit(1)
 
 # Use the actual PostgreSQL database
 DB_USER = os.getenv('DB_USER', 'postgres')
