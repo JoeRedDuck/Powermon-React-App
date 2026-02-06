@@ -550,7 +550,23 @@ def get_stats(session: Session = Depends(get_db)):
 
 @app.delete("/api/v1/devices/{mac}")
 def remove_device(mac: str, session: Session = Depends(get_db)):
-    return {"status": "deleted" if db.delete_device(session, mac) else "not_deleted"}
+    # Handle invalid MAC addresses (null, empty, etc.)
+    if not mac or mac.lower() == "null" or mac.lower() == "none":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "reason": "Invalid MAC address. For machines without monitors, use DELETE /api/v1/machines/{machine_name}"
+            }
+        )
+    
+    if db.delete_device(session, mac):
+        return {"status": "deleted"}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail={"status": "not_found", "reason": f"Device with MAC {mac} not found"}
+        )
 
 
 @app.delete("/api/v1/machines/{machine_name}")
