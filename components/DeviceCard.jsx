@@ -1,7 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
-import { Ionicons } from '@expo/vector-icons';
 import StatusPill from "../components/StatusPill";
 import { isMachineMuted } from "../utils/muteService.jsx";
 
@@ -9,10 +9,11 @@ export default function DeviceCard ({ device }) {
   const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
-    if (device?.mac) {
-      isMachineMuted(device.mac).then(setIsMuted);
+    if (device?.name) {
+      // Check mute status using device name, not MAC
+      isMachineMuted(device.name).then(setIsMuted);
     }
-  }, [device?.mac]);
+  }, [device?.name]);
 
   if (!device) { console.warn('DeviceCard: missing device prop'); return null; }
 

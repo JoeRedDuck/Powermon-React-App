@@ -39,7 +39,7 @@ export async function getMutedMachines() {
 }
 
 // Mute a machine
-export async function muteMachine(machineId) {
+export async function muteMachine(deviceName) {
   try {
     const deviceId = await getDeviceId();
     const apiUrl = await getApiUrl();
@@ -49,7 +49,7 @@ export async function muteMachine(machineId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         device_id: deviceId,
-        machine_name: machineId 
+        machine_name: deviceName  // Send device name (e.g., "Condenser 1") not MAC
       })
     });
     
@@ -57,8 +57,8 @@ export async function muteMachine(machineId) {
     
     // Update cache
     const mutedMachines = await getMutedMachines();
-    if (!mutedMachines.includes(machineId)) {
-      mutedMachines.push(machineId);
+    if (!mutedMachines.includes(deviceName)) {
+      mutedMachines.push(deviceName);
       await AsyncStorage.setItem(MUTED_CACHE_KEY, JSON.stringify(mutedMachines));
     }
     
@@ -70,19 +70,19 @@ export async function muteMachine(machineId) {
 }
 
 // Unmute a machine
-export async function unmuteMachine(machineId) {
+export async function unmuteMachine(deviceName) {
   try {
     const deviceId = await getDeviceId();
     const apiUrl = await getApiUrl();
     
-    const url = `${apiUrl}/api/v1/muted-machines?device_id=${encodeURIComponent(deviceId)}&machine_name=${encodeURIComponent(machineId)}`;
+    const url = `${apiUrl}/api/v1/muted-machines?device_id=${encodeURIComponent(deviceId)}&machine_name=${encodeURIComponent(deviceName)}`;
     const response = await fetch(url, { method: 'DELETE' });
     
     if (!response.ok) throw new Error('Failed to unmute machine');
     
     // Update cache
     const mutedMachines = await getMutedMachines();
-    const filtered = mutedMachines.filter(id => id !== machineId);
+    const filtered = mutedMachines.filter(name => name !== deviceName);
     await AsyncStorage.setItem(MUTED_CACHE_KEY, JSON.stringify(filtered));
     
     return true;
@@ -93,10 +93,10 @@ export async function unmuteMachine(machineId) {
 }
 
 // Check if a specific machine is muted
-export async function isMachineMuted(machineId) {
+export async function isMachineMuted(deviceName) {
   try {
     const mutedMachines = await getMutedMachines();
-    return mutedMachines.includes(machineId);
+    return mutedMachines.includes(deviceName);
   } catch (error) {
     console.error('Failed to check mute status:', error);
     return false;

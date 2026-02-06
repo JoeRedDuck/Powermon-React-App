@@ -1,10 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
+import Constants from "expo-constants";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Ionicons } from '@expo/vector-icons';
 import { getMutedMachines, muteMachine, unmuteMachine } from "../utils/muteService.jsx";
-import useGetDevice from "../utils/getDevice.jsx";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 
 function DeviceToggleItem({ device, isMuted, onToggle, busy }) {
   return (
@@ -81,17 +79,22 @@ export default function MutedDevices() {
     setBusyMacs(prev => new Set(prev).add(mac));
     
     try {
-      const isMuted = mutedMacs.includes(mac);
+      // Find the device to get its name
+      const device = allDevices.find(d => d.mac === mac);
+      if (!device) return;
+      
+      const deviceName = device.name; // Use device.name (e.g., "Condenser 1")
+      const isMuted = mutedMacs.includes(deviceName);
       
       if (isMuted) {
-        const success = await unmuteMachine(mac);
+        const success = await unmuteMachine(deviceName);
         if (success) {
-          setMutedMacs(prev => prev.filter(m => m !== mac));
+          setMutedMacs(prev => prev.filter(m => m !== deviceName));
         }
       } else {
-        const success = await muteMachine(mac);
+        const success = await muteMachine(deviceName);
         if (success) {
-          setMutedMacs(prev => [...prev, mac]);
+          setMutedMacs(prev => [...prev, deviceName]);
         }
       }
     } finally {
@@ -134,15 +137,20 @@ export default function MutedDevices() {
         </Text>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {allDevices.map((device) => (
-          <DeviceToggleItem 
-            key={device.mac} 
-            device={device}
-            isMuted={mutedMacs.includes(device.mac)}
-            onToggle={handleToggle}
-            busy={busyMacs.has(device.mac)}
-          />
-        ))}
+        {allDevices.map((device) => {
+          // Check if device name is in muted list (not MAC address)
+          const isMuted = mutedMacs.includes(device.name);
+          
+          return (
+            <DeviceToggleItem 
+              key={device.mac} 
+              device={device}
+              isMuted={isMuted}
+              onToggle={handleToggle}
+              busy={busyMacs.has(device.mac)}
+            />
+          );
+        })}
       </ScrollView>
     </View>
   );
