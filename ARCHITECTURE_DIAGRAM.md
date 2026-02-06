@@ -504,6 +504,210 @@ curl -X PUT http://localhost:8000/api/devices/my_device/muted-machines \
 **Status:** ✅ Ready for deployment  
 **Next Action:** Create database table and restart server  
 **Documentation:** See MUTE_PREFERENCES_GUIDE.md for complete details
+
+---
+
+# Device Creation & Deletion API - Recent Fixes (Feb 2026)
+
+## Bug Fix #1: Monitor ID Validation
+
+### Problem
+Mobile apps sending `id: 0` as a default value were getting validation errors:
+```json
+{
+  "detail": [{"msg": "Monitor ID must be a positive integer"}]
+}
+```
+
+### Solution
+The validator now treats `id: 0` (or any non-positive value) as "not provided" by converting it to `None`.
+
+**Before:**
+```python
+@validator('id')
+def validate_monitor_id(cls, v):
+    if v is not None and v <= 0:
+        raise ValueError('Monitor ID must be a positive integer')
+    return v
+```
+
+**After:**
+```python
+@validator('id')
+def validate_monitor_id(cls, v):
+    # Treat 0 or negative as None (not provided)
+    if v is not None and v <= 0:
+        return None
+    return v
+```
+
+### Impact
+Mobile apps can now use default values without worrying about validation errors:
+```json
+{
+  "name": "Test 1",
+  "id": 0,
+  "mac": "",
+  "machine_type": "Pump",
+  "location": "Production line"
+}
+```
+This is automatically normalized to:
+```json
+{
+  "name": "Test 1",
+  "id": null,
+  "mac": null,
+  "machine_type": "Pump",
+  "location": "Production line"
+}
+```
+
+---
+
+## Bug Fix #2: Device Deletion with Null MAC
+
+### Problem
+Machines without monitors returned `mac: null` in the device list. When mobile apps tried to delete them using:
+```
+DELETE /api/v1/devices/null
+```
+The server returned `200 OK` with `{"status": "not_deleted"}`, making apps think the deletion succeeded when it actually failed.
+
+### Solution
+The endpoint now properly validates MAC addresses and returns appropriate HTTP status codes:
+
+**Updated Endpoint:**
+```python
+@app.delete("/api/v1/devices/{mac}")
+def remove_device(mac: str, session: Session = Depends(get_db)):
+    # Handle invalid MAC addresses (null, empty, etc.)
+    if not mac or mac.lower() == "null" or mac.lower() == "none":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "error",
+                "reason": "Invalid MAC address. For machines without monitors, use DELETE /api/v1/machines/{machine_name}"
+            }
+        )
+    
+    if db.delete_device(session, mac):
+        return {"status": "deleted"}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail={"status": "not_found", "reason": f"Device with MAC {mac} not found"}
+        )
+```
+
+### Response Codes
+
+| Scenario | HTTP Status | Response |
+|----------|-------------|----------|
+| Valid MAC, device deleted | 200 OK | `{"status": "deleted"}` |
+| Invalid MAC (null/empty) | 400 Bad Request | Error with guidance |
+| Valid MAC, device not found | 404 Not Found | Error message |
+
+### Mobile App Integration
+
+```javascript
+// Check if device has a MAC before deleting
+if (device.mac === null || device.mac === undefined) {
+  // Machine without monitor - use machines endpoint
+  await DELETE(`/api/v1/machines/${encodeURIComponent(device.name)}`);
+} else {
+  // Device with monitor - use devices endpoint
+  await DELETE(`/api/v1/devices/${encodeURIComponent(device.mac)}`);
+}
+```
+
+---
+
+## Device Creation API - Three Scenarios
+
+### POST `/api/v1/devices`
+
+The device creation endpoint supports three distinct scenarios:
+
+#### Scenario 1: Create Device with New Monitor (MAC Provided)
+```json
+POST /api/v1/devices
+{
+  "name": "Pump 1",
+  "mac": "AA:BB:CC:DD:EE:FF",
+  "id": 123,
+  "machine_type": "Pump",
+  "location": "Building 1"
+}
+```
+**Result:** Creates monitor with MAC, creates/updates machine, attaches monitor to machine
+
+#### Scenario 2: Create Device with Existing Monitor (ID Only)
+```json
+POST /api/v1/devices
+{
+  "name": "Pump 2",
+  "id": 123,
+  "machine_type": "Pump",
+  "location": "Building 1"
+}
+```
+**Result:** Finds monitor by ID, creates/updates machine, attaches monitor to machine
+
+#### Scenario 3: Create Machine Without Monitor
+```json
+POST /api/v1/devices
+{
+  "name": "Pump 3",
+  "machine_type": "Pump",
+  "location": "Building 1"
+}
+```
+**Result:** Creates machine only (no monitor). Machine name must be unique.
+
+### Field Processing
+
+| Field | Required | Processing |
+|-------|----------|------------|
+| `name` | ✅ Yes | Machine name (must be unique for Scenario 3) |
+| `machine_type` | ✅ Yes | Type of machine |
+| `location` | ✅ Yes | Physical location |
+| `mac` | ❌ No | Empty string `""` → `null` |
+| `id` | ❌ No | `0` or negative → `null` |
+
+### Error Responses
+
+```json
+// MAC already exists
+{
+  "status_code": 400,
+  "detail": {
+    "status": "error",
+    "reason": "Monitor with MAC address 'AA:BB:CC:DD:EE:FF' already exists"
+  }
+}
+
+// Monitor ID not found
+{
+  "status_code": 404,
+  "detail": {
+    "status": "error",
+    "reason": "Monitor with ID 123 not found"
+  }
+}
+
+// Machine name already exists (Scenario 3 only)
+{
+  "status_code": 400,
+  "detail": {
+    "status": "error",
+    "reason": "Machine 'Pump 3' already exists"
+  }
+}
+```
+
+---
+
 # Monitor Management API Endpoints
 
 ## Overview
