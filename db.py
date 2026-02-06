@@ -536,7 +536,7 @@ def add_device(db: Session, device_data) -> tuple[bool, str]:
     # 1. Check if Machine exists
     machine = db.query(models.Machine).filter(
         models.Machine.name == device_data.name).first()
-    
+
     # If no monitor info provided (scenario 3), machine name must be unique
     if not device_data.mac and device_data.id is None:
         if machine:
@@ -552,7 +552,7 @@ def add_device(db: Session, device_data) -> tuple[bool, str]:
         db.add(machine)
         db.commit()
         return True, ""
-    
+
     # For scenarios 1 & 2 (monitor involved), create or update machine
     if not machine:
         # Create new machine

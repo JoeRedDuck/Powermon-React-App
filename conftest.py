@@ -5,6 +5,7 @@ import os
 import sys
 import pytest
 
+
 def pytest_configure(config):
     """
     Safety check: Ensure tests never use production database
@@ -12,16 +13,17 @@ def pytest_configure(config):
     # Check if any dangerous production database access is attempted
     db_host = os.getenv('DB_HOST')
     db_name = os.getenv('DB_NAME')
-    
+
     if db_host and db_name:
         print(f"\n⚠️  WARNING: Production database environment variables detected!")
         print(f"   DB_HOST: {db_host}")
         print(f"   DB_NAME: {db_name}")
         print(f"   Tests should use in-memory SQLite databases only.\n")
-        
+
     # Verify no test is trying to use production database URL
     if 'postgresql' in str(config.args):
-        pytest.exit("❌ ERROR: Tests should not use PostgreSQL production database!", returncode=1)
+        pytest.exit(
+            "❌ ERROR: Tests should not use PostgreSQL production database!", returncode=1)
 
 
 def pytest_collection_modifyitems(config, items):

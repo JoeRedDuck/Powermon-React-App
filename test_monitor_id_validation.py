@@ -24,10 +24,11 @@ def test_negative_monitor_id_rejected(client):
         "machine_type": "Extruder",
         "location": "Building 1"
     })
-    
+
     assert response.status_code == 422
     error_detail = response.json()["detail"]
-    assert any("Monitor ID must be a positive integer" in str(err) for err in error_detail)
+    assert any("Monitor ID must be a positive integer" in str(err)
+               for err in error_detail)
 
 
 def test_zero_monitor_id_rejected(client):
@@ -38,10 +39,11 @@ def test_zero_monitor_id_rejected(client):
         "machine_type": "Mixer",
         "location": "Building 2"
     })
-    
+
     assert response.status_code == 422
     error_detail = response.json()["detail"]
-    assert any("Monitor ID must be a positive integer" in str(err) for err in error_detail)
+    assert any("Monitor ID must be a positive integer" in str(err)
+               for err in error_detail)
 
 
 def test_positive_monitor_id_accepted(client):
@@ -55,7 +57,7 @@ def test_positive_monitor_id_accepted(client):
         "location": "Building 3"
     })
     assert response.status_code == 200
-    
+
     # Now use that monitor's ID (123) for another machine
     response = client.post("/api/v1/devices", json={
         "name": "Machine C",
@@ -63,7 +65,7 @@ def test_positive_monitor_id_accepted(client):
         "machine_type": "Mixer",
         "location": "Building 4"
     })
-    
+
     # Should succeed - monitor 123 exists and can be attached
     assert response.status_code == 200
 
@@ -76,7 +78,7 @@ def test_none_monitor_id_accepted(client):
         "machine_type": "Press",
         "location": "Building 5"
     })
-    
+
     assert response.status_code == 200
 
 
@@ -87,5 +89,5 @@ def test_omitted_monitor_id_accepted(client):
         "machine_type": "Cutter",
         "location": "Building 6"
     })
-    
+
     assert response.status_code == 200

@@ -78,8 +78,9 @@ class DeviceCreate(BaseModel):
 
     @validator('id')
     def validate_monitor_id(cls, v):
+        # Treat 0 or negative as None (not provided)
         if v is not None and v <= 0:
-            raise ValueError('Monitor ID must be a positive integer')
+            return None
         return v
 
     @root_validator(skip_on_failure=True)
@@ -706,7 +707,7 @@ def create_device(device: DeviceCreate, session: Session = Depends(get_db)):
     success, error_msg = db.add_device(session, device)
     if success:
         return {"status": "created", "device": device.dict()}
-    
+
     # Determine appropriate status code based on error
     status_code = 404 if "not found" in error_msg.lower() else 400
     raise HTTPException(status_code=status_code, detail={
