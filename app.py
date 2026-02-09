@@ -559,13 +559,14 @@ def remove_device(mac: str, session: Session = Depends(get_db)):
                 "reason": "Invalid MAC address. For machines without monitors, use DELETE /api/v1/machines/{machine_name}"
             }
         )
-    
+
     if db.delete_device(session, mac):
         return {"status": "deleted"}
     else:
         raise HTTPException(
             status_code=404,
-            detail={"status": "not_found", "reason": f"Device with MAC {mac} not found"}
+            detail={"status": "not_found",
+                    "reason": f"Device with MAC {mac} not found"}
         )
 
 
