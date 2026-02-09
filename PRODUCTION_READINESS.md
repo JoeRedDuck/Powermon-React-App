@@ -30,9 +30,7 @@ POST /api/v1/polls
 - HTTP interface for remote data collectors
 - Same validation as helper function
 - Proper error responses (404 for missing monitor, 400 for invalid data)
-
-#### C. Example Script: [insert_poll_example.py](insert_poll_example.py)
-Demonstrates correct usage for external scripts.
+- See [test_poll_insertion.py](test_poll_insertion.py) for usage examples
 
 **Action Required:**
 ⚠️ **Update any external data collection scripts** to use one of these methods.

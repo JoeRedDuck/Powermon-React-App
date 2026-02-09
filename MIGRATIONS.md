@@ -191,81 +191,40 @@ If issues arise, you can temporarily modify queries to use the old logic:
 - ✅ [models.py](models.py) - Added machine_name column and relationships
 - ✅ [db.py](db.py) - Updated all queries + added insert_poll()
 - ✅ [app.py](app.py) - Added POST /api/v1/polls endpoint
-- ✅ [schema_v3.sql](schema_v3.sql) - Fixed missing comma, verified FK constraints
+- ✅ [schema_v3.sql](schema_v3.sql) - Includes deferrable FK constraints
 - ✅ [setup_db.py](setup_db.py) - Added machine_name index
 - ✅ [test_db.py](test_db.py) - Updated all poll creations
-- ✅ [debug_query.py](debug_query.py) - Updated test query
-- ✅ [insert_poll_example.py](insert_poll_example.py) - NEW: Example script for external use
+- ✅ [test_poll_insertion.py](test_poll_insertion.py) - Comprehensive tests
 
 ## Next Steps
 1. ✅ Review this guide
 2. ⚠️ **CRITICAL**: Update external data collection scripts/services that insert poll data
-3. ✅ Run `python setup_db.py` to create indexes (or run migration SQL)
-4. ✅ Run tests: `pytest test_db.py -v`
-5. ✅ Test poll insertion with example script
-6. ✅ Monitor logs for foreign key constraint errors
-7. ✅ Verify alerting logic works as expected with machine-based grouping
-# Machine Rename Fix - Migration Required
+3. ✅ Run `python setup_db.py` to create database with proper constraints
+4. ✅ Run tests: `pytest -v`
+5. ✅ Monitor logs for foreign key constraint errors
+6. ✅ Verify alerting logic works as expected with machine-based grouping
+# Machine Rename Fix - Included in Schema
 
 ## Problem
 The API was freezing when trying to rename machines because FK constraints on `monitor` and `poll` tables were not deferrable. This required ALTER TABLE commands that caused exclusive locks and deadlocks.
 
 ## Solution
-Make the FK constraints DEFERRABLE so we can use `SET CONSTRAINTS DEFERRED` instead of ALTER TABLE.
+FK constraints are now DEFERRABLE by default in the schema. The code automatically uses `SET CONSTRAINTS DEFERRED` for lock-free machine renames.
 
-## Migration Steps (RUN ONCE ON PRODUCTION)
+## Setup
+Simply run `setup_db.py` to create the database with proper constraints:
 
-### Option 1: Using psql directly
 ```bash
-# SSH to production server
-ssh neil@tapomon
-
-# Run as postgres user
-sudo su postgres
-psql -d powermon_db3 -f /home/neil/Documents/fastAPI/migrate_fk_deferrable.sql
+python setup_db.py
 ```
 
-### Option 2: Using apply_migration.sh script
-```bash
-# SSH to production server
-cd /home/neil/Documents/fastAPI
+No migration needed - the schema includes deferrable constraints from the start.
 
-# Edit and run the migration script with correct credentials
-export DB_USER=powermon
-export DB_PASS=<your_password_here>
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_NAME=powermon_db3
-
-./apply_migration.sh
-```
-
-## What the migration does
-1. Drops `monitor_machine_name_fkey` constraint
-2. Recreates it as DEFERRABLE INITIALLY IMMEDIATE
-3. Drops `poll_machine_name_fkey` constraint  
-4. Recreates it as DEFERRABLE INITIALLY IMMEDIATE with ON DELETE CASCADE
-
-## After migration
-- Machine renames will be LOCK-FREE (no ALTER TABLE)
-- Uses `SET CONSTRAINTS ... DEFERRED` instead
-- No more API freezing
-- No more deadlocks
-
-## Verification
-After running migration, verify constraints are deferrable:
-```sql
-SELECT conname, condeferrable, condeferred 
-FROM pg_constraint 
-WHERE conname IN ('monitor_machine_name_fkey', 'poll_machine_name_fkey');
-```
-
-Both should show `condeferrable = true`.
-
-##Fallback
-The code automatically detects if constraints are deferrable:
-- If YES: Uses fast `SET CONSTRAINTS DEFERRED` path (no locks)
-- If NO: Uses slower ALTER TABLE path with 2s timeout (may still cause issues)
+## How It Works
+- Monitor and poll FK constraints are `DEFERRABLE INITIALLY IMMEDIATE`
+- When renaming machines, code uses `SET CONSTRAINTS ... DEFERRED`
+- No ALTER TABLE locks - instant, safe renames
+- Foreign key checks happen at transaction commit
 
 ## Testing
 Run the PostgreSQL test to verify:
