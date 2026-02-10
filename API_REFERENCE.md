@@ -294,6 +294,53 @@ GET /api/v1/power?mac=AA:BB:CC:DD:EE:FF&time_range=1h&bucket=1m
 
 ---
 
+### Insert Poll Data
+```
+POST /api/v1/polls
+Content-Type: application/json
+```
+
+**Insert a new poll record from external data sources. Automatically resolves machine_name from monitor_mac.**
+
+**Request:**
+```json
+{
+  "monitor_mac": "AA:BB:CC:DD:EE:FF",
+  "power_usage": 1500,
+  "poll_time": "2026-02-10T10:30:00Z"  // Optional, defaults to current time
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "status": "created",
+  "poll": {
+    "monitor_mac": "AA:BB:CC:DD:EE:FF",
+    "power_usage": 1500,
+    "poll_time": "2026-02-10T10:30:00Z"
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "detail": {
+    "status": "monitor_not_found",
+    "reason": "Monitor AA:BB:CC:DD:EE:FF not found. Register the device first."
+  }
+}
+```
+
+**⚠️ Important:**
+- Monitor must exist in database before inserting polls
+- Monitor must be assigned to a machine
+- If `poll_time` is omitted, uses current UTC time
+- Used by external monitoring scripts/services
+
+---
+
 ## 🔔 Push Notifications
 
 ### Register Notification Token
@@ -589,6 +636,36 @@ POST /api/v1/monitors/{monitor_id}/unassign
 
 ---
 
+### Delete Monitor
+```
+DELETE /api/v1/monitors/{monitor_id}
+```
+
+**Permanently delete a monitor from the database.**
+
+**Response (200):**
+```json
+{
+  "status": "Monitor 123 deleted successfully",
+  "monitor_id": 123
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "detail": "Cannot delete monitor with associated poll data. Use unassign endpoint instead to preserve historical data."
+}
+```
+
+**⚠️ Important:**
+- Monitors with associated poll data cannot be deleted
+- Use the unassign endpoint instead to preserve historical data
+- Only delete monitors that have never recorded any data
+- Consider unassigning instead of deleting in most cases
+
+---
+
 ## 📍 Locations & Types
 
 ### Get All Locations
@@ -725,6 +802,11 @@ await POST('/api/v1/muted-machines', {
 - Update: `PUT /api/v1/monitors/{monitor_id}` (updates MAC/ID and all associated polls)
 - Reassign: `POST /api/v1/monitors/{monitor_id}/reassign?machine_name={name}`
 - Unassign: `POST /api/v1/monitors/{monitor_id}/unassign`
+- Delete: `DELETE /api/v1/monitors/{monitor_id}` (only if no poll data exists)
+
+**Poll Data:**
+- Get History: `GET /api/v1/power?mac={mac}&time_range={range}&bucket={bucket}`
+- Insert: `POST /api/v1/polls` (for external data sources)
 
 **Always URL encode:**
 - Machine names with spaces
