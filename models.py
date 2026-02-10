@@ -22,7 +22,8 @@ class Monitor(Base):
     id = Column("monitor_id", Integer)
     type = Column(String)
 
-    machine_name = Column(String, ForeignKey("machine.machine_name"))
+    machine_name = Column(String, ForeignKey(
+        "machine.machine_name", deferrable=True, initially="DEFERRED"))
 
     machine = relationship("Machine", back_populates="monitors")
     polls = relationship("Poll", back_populates="monitor")
@@ -34,7 +35,8 @@ class Poll(Base):
     id = Column("poll_number", Integer, primary_key=True, autoincrement=True)
     poll_time = Column(DateTime)
     power_usage = Column(Integer)
-    machine_name = Column(String, ForeignKey("machine.machine_name"))
+    machine_name = Column(String, ForeignKey(
+        "machine.machine_name", deferrable=True, initially="DEFERRED"))
     monitor_mac = Column("device_mac_address", String,
                          ForeignKey("monitor.monitor_mac_address"))
 
