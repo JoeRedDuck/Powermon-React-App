@@ -503,6 +503,56 @@ Content-Type: application/json
 
 ---
 
+### Update Monitor
+```
+PUT /api/v1/monitors/{monitor_id}
+Content-Type: application/json
+```
+
+**Update a monitor's ID and/or MAC address. All associated poll records will be updated automatically.**
+
+**Request (update MAC only):**
+```json
+{
+  "mac": "DD:EE:FF:00:11:22"
+}
+```
+
+**Request (update ID only):**
+```json
+{
+  "id": 126
+}
+```
+
+**Request (update both):**
+```json
+{
+  "id": 126,
+  "mac": "DD:EE:FF:00:11:22"
+}
+```
+
+**Response (200):**
+```json
+{
+  "status": "Monitor updated successfully",
+  "monitor": {
+    "id": 126,
+    "mac": "DD:EE:FF:00:11:22",
+    "machine_name": "Pump 5"
+  }
+}
+```
+
+**⚠️ Important:**
+- At least one field (id or mac) must be provided
+- New MAC and ID must not already exist in the database
+- **All poll records** referencing the old MAC will be automatically updated to the new MAC
+- This ensures historical power data stays with the correct monitor
+
+---
+
 ### Reassign Monitor
 ```
 POST /api/v1/monitors/{monitor_id}/reassign?machine_name={machine_name}
@@ -668,6 +718,13 @@ await POST('/api/v1/muted-machines', {
 - Create: `POST /api/v1/devices`
 - Update: `PUT /api/v1/devices/{mac}`
 - Delete: `DELETE /api/v1/devices/{mac}` or `DELETE /api/v1/machines/{name}`
+
+**Monitor Operations:**
+- List: `GET /api/v1/monitors`
+- Create: `POST /api/v1/monitors`
+- Update: `PUT /api/v1/monitors/{monitor_id}` (updates MAC/ID and all associated polls)
+- Reassign: `POST /api/v1/monitors/{monitor_id}/reassign?machine_name={name}`
+- Unassign: `POST /api/v1/monitors/{monitor_id}/unassign`
 
 **Always URL encode:**
 - Machine names with spaces
