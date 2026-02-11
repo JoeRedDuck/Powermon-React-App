@@ -11,7 +11,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.prozomix.powermon"
+      "bundleIdentifier": "com.prozomix.powermon",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.prozomix.powermon",

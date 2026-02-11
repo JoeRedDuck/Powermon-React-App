@@ -7,6 +7,7 @@ import { router } from "expo-router";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { getApiUrl } from "./apiConfig";
+import { getDeviceId } from "./deviceId"; // Import to ensure consistent device ID
 
 const STORAGE_KEY = "powermon_notifications_v1";
 const NotificationContext = createContext(null);
@@ -28,7 +29,8 @@ export function NotificationProvider({ children }) {
           const apiBase = await getApiUrl();
           const base = `${apiBase}/api/v1`;
           
-          const deviceName = Constants.deviceName || Device.modelName || "Unknown Device";
+          // Use the same device ID as mute preferences to ensure consistency
+          const deviceName = await getDeviceId();
           const url = `${base}/notifications/register`;
           
           console.log("Registering token at:", url);

@@ -49,7 +49,17 @@ export default function ManageDeviceCard({ device, onDelete }) {
       process.env.EXPO_PUBLIC_API_BASE ||
       Constants.expoConfig?.extra?.apiBase ||
       '';
-    const url = `${apiBase.replace(/\/$/, '')}/api/v1/devices/${mac}`;
+    
+    // Smart delete: use /machines endpoint for devices without monitors (mac === null)
+    let url;
+    if (mac === null || mac === '') {
+      // Machine without monitor - use machine name
+      url = `${apiBase.replace(/\/$/, '')}/api/v1/machines/${encodeURIComponent(device.name)}`;
+    } else {
+      // Device with monitor - use MAC address
+      url = `${apiBase.replace(/\/$/, '')}/api/v1/devices/${encodeURIComponent(mac)}`;
+    }
+    
     const response = await fetch(url, { method: "DELETE" });
 
     if (!response.ok) {

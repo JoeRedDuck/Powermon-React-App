@@ -14,8 +14,9 @@ export default function Device () {
   const [graphPoints, setGraphPoints] = useState([]);
   const device = useGetDevice(mac);
   const currentPower = (device?.last_power != "offline") ? device?.last_power : "-"
-  const [timeRange,setTimeRange] = useState("3h")
-  const [bucket, setBucket] = useState("1m");
+  const [timeRange,setTimeRange] = useState("24h")
+  const [bucket, setBucket] = useState("10m");
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const yValues = graphPoints.map((point) => point.value);
   const hasNonZeroData = yValues.some((value) => value !== 0);
   const [min, setMin] = useState("-")
@@ -45,10 +46,12 @@ export default function Device () {
         const opt = TIME_OPTIONS.find(o => o.value === saved);
         if (opt) setBucket(opt.bucket);
       }
+      setPreferencesLoaded(true);
     });
   }, []);
 
   useEffect(() => {
+  if (!preferencesLoaded) return;
   if (typeof mac !== "string" || mac.length === 0) return;
 
   const apiBase =
@@ -60,15 +63,32 @@ export default function Device () {
     mac
   )}&time_range=${timeRange}&bucket=${bucket}`;
 
+  // Debug: log the outgoing URL and current range/bucket
+  console.log("[device] fetching power url:", url, { timeRange, bucket });
+
   fetch(url)
     .then((response) => response.json())
     .then((data) => {
+      // Debug: log data summary
+      try {
+        const pts = Array.isArray(data.points) ? data.points : [];
+        console.log("[device] power response points:", pts.length);
+      } catch (e) {
+        console.log("[device] failed to inspect response", e);
+      }
       const backendPoints = Array.isArray(data.points) ? data.points : [];
       const mapped = backendPoints.map((backendPoint) => ({
         value: Number(backendPoint.value),
         date: new Date(backendPoint.date),
       }));
       mapped.sort((a, b) => a.date - b.date);
+      console.log(
+        "[device] mapped range",
+        mapped.length ? mapped[0].date.toISOString() : null,
+        mapped.length ? mapped[mapped.length - 1].date.toISOString() : null,
+        "(count)",
+        mapped.length
+      );
       setGraphPoints(mapped);
       setMin(data.min);
       setMax(data.max);
@@ -79,7 +99,7 @@ export default function Device () {
       setGraphPoints([]);
       
     });
-  }, [mac, timeRange, bucket]);
+  }, [mac, timeRange, bucket, preferencesLoaded]);
 
   const victoryPoints = graphPoints.map((p) => ({
         x: p.date,
@@ -147,6 +167,12 @@ export default function Device () {
 
             <VictoryAxis
               fixLabelOverlap={true}
+              tickFormat={(date) => {
+                const d = new Date(date);
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                return `${hours}:${minutes}`;
+              }}
               style={{
                 tickLabels: { fontSize: 10, fill: "#4B5563" },
               }}

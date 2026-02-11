@@ -53,7 +53,7 @@ export default function AddMonitor() {
   useEffect(() => {
     if (!base) return;
     
-    const url = `${base}/machines`;
+    const url = `${base}/devices`;
     fetch(url)
       .then(r => r.json())
       .then(data => {
@@ -95,45 +95,16 @@ export default function AddMonitor() {
 
     try {
       if (isEdit) {
-        // For editing, validate required fields
-        if (!monitorId || !mac) {
-          Alert.alert("Error", "Please fill in Monitor ID and MAC Address");
-          setBusy(false);
-          return;
-        }
-
-        // Update monitor ID and MAC if changed
-        const payload = {
-          id: parseInt(monitorId, 10),
-          mac: mac
-        };
-
-        const updateRes = await fetch(`${base}/monitors/${monitor.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        if (!updateRes.ok) {
-          let msg;
-          try {
-            const body = await updateRes.json();
-            msg = body?.detail?.reason || body?.detail || body?.message || body?.error;
-          } catch {
-            msg = await updateRes.text();
-          }
-          const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
-          Alert.alert("Error", `Update failed: ${errorMsg}`);
-          throw new Error(errorMsg || `Update failed (${updateRes.status})`);
-        }
-
-        // If machine assignment changed, call reassign endpoint
+        // For editing monitors, only allow reassigning to different machines
+        // API doesn't support updating monitor ID or MAC via PUT endpoint
+        
         const originalMachine = monitor.name || monitor.machine_name || '';
+        
         if (selectedMachine !== originalMachine) {
           if (selectedMachine) {
             // Reassign to a machine
             const reassignRes = await fetch(
-              `${base}/monitors/${parseInt(monitorId, 10)}/reassign?machine_name=${encodeURIComponent(selectedMachine)}`,
+              `${base}/monitors/${monitor.id}/reassign?machine_name=${encodeURIComponent(selectedMachine)}`,
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" }
@@ -149,11 +120,12 @@ export default function AddMonitor() {
                 msg = await reassignRes.text();
               }
               const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
-              Alert.alert("Warning", `Monitor updated but reassignment failed: ${errorMsg}`);
+              Alert.alert("Error", `Reassignment failed: ${errorMsg}`);
+              throw new Error(errorMsg || `Reassignment failed (${reassignRes.status})`);
             }
           } else if (originalMachine) {
             // Unassign from machine
-            const unassignRes = await fetch(`${base}/monitors/${parseInt(monitorId, 10)}/unassign`, {
+            const unassignRes = await fetch(`${base}/monitors/${monitor.id}/unassign`, {
               method: "POST",
               headers: { "Content-Type": "application/json" }
             });
@@ -167,12 +139,13 @@ export default function AddMonitor() {
                 msg = await unassignRes.text();
               }
               const errorMsg = typeof msg === 'string' ? msg : JSON.stringify(msg);
-              Alert.alert("Warning", `Monitor updated but unassignment failed: ${errorMsg}`);
+              Alert.alert("Error", `Unassignment failed: ${errorMsg}`);
+              throw new Error(errorMsg || `Unassignment failed (${unassignRes.status})`);
             }
           }
         }
 
-        Alert.alert("Success", "Monitor updated successfully");
+        Alert.alert("Success", "Monitor assignment updated");
         router.back();
         return;
       }
@@ -225,24 +198,28 @@ export default function AddMonitor() {
       <View>
         <Text style={styles.label}>Monitor ID:</Text>
         <TextInput 
-          style={styles.input}
+          style={[styles.input, isEdit && styles.readOnlyInput]}
           placeholder="1"
           placeholderTextColor="#9CA3AF"
           value={monitorId}
           onChangeText={setMonitorId}
-          keyboardType="numeric">
+          keyboardType="numeric"
+          editable={!isEdit}>
         </TextInput>
+        {isEdit && <Text style={styles.hint}>Monitor ID cannot be changed</Text>}
       </View>
 
       <View>
         <Text style={styles.label}>MAC Address:</Text>
         <TextInput 
-          style={styles.input}
+          style={[styles.input, isEdit && styles.readOnlyInput]}
           placeholder="C8:C9:A3:1A:F2:DB"
           placeholderTextColor="#9CA3AF"
           value={mac}
-          onChangeText={setMac}>
+          onChangeText={setMac}
+          editable={!isEdit}>
         </TextInput>
+        {isEdit && <Text style={styles.hint}>MAC Address cannot be changed</Text>}
       </View>
 
       <View>
@@ -297,6 +274,17 @@ const styles = StyleSheet.create({
     marginTop: 10,
     padding: 10,
     color: "#111827"
+  },
+  readOnlyInput: {
+    backgroundColor: "#F3F4F6",
+    color: "#6B7280"
+  },
+  hint: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontStyle: "italic",
+    marginTop: 2,
+    marginBottom: 5
   },
   pickerWrapper: {
     height: 45,

@@ -22,69 +22,32 @@ export default function ManageMonitorCard({monitor, onDelete}) {
   async function handleRemove() {
     if (busy) return;
 
-    // Show confirmation with options
-    const alertOptions = Platform.select({
-      web: { text: "Unassign", onPress: () => unassignMonitor() },
-      default: [
-        { text: "Cancel", style: "cancel" },
-        { text: "Unassign Only", onPress: () => unassignMonitor() },
-        { text: "Delete Permanently", onPress: () => deleteMonitor(), style: "destructive" }
-      ]
-    });
+    const message = monitor.name || monitor.machine_name 
+      ? `This will permanently delete Monitor ${monitor.id} (${monitor.mac}) and remove it from ${monitor.name || monitor.machine_name}.`
+      : `This will permanently delete Monitor ${monitor.id} (${monitor.mac}).`;
 
     if (Platform.OS === 'web') {
-      // Web doesn't support multiple buttons well
       const confirmed = confirm(
-        `Do you want to unassign Monitor ${monitor.id}?\n\n` +
-        `This will remove the monitor from ${monitor.name || 'the machine'} but keep it in the system.`
+        `Delete Monitor ${monitor.id}?\n\n${message}`
       );
-      if (confirmed) await unassignMonitor();
+      if (confirmed) await deleteMonitor();
     } else {
       Alert.alert(
-        "Remove Monitor",
-        `Monitor ${monitor.id} is assigned to ${monitor.name || 'a machine'}.\n\nWhat would you like to do?`,
-        alertOptions
+        "Delete Monitor",
+        message,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", onPress: () => deleteMonitor(), style: "destructive" }
+        ]
       );
     }
   }
 
-  // Unassign monitor from machine
-  async function unassignMonitor() {
-    setBusy(true);
-    try {
-      const res = await fetch(`${base}/monitors/${monitor.id}/unassign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-
-      if (!res.ok) {
-        let errorMsg;
-        try {
-          const body = await res.json();
-          errorMsg = body?.detail?.reason || body?.detail || body?.message || body?.error;
-        } catch {
-          errorMsg = await res.text();
-        }
-        throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
-      }
-
-      Alert.alert("Success", `Monitor ${monitor.id} has been unassigned`);
-      
-      // Call parent callback to refresh list
-      if (onDelete) onDelete(monitor.id);
-      
-    } catch (err) {
-      Alert.alert("Error", `Failed to unassign monitor: ${err.message}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Delete monitor permanently
+  // Delete monitor using the device deletion endpoint
   async function deleteMonitor() {
     setBusy(true);
     try {
-      const res = await fetch(`${base}/monitors/${monitor.id}`, {
+      const res = await fetch(`${base}/devices/${encodeURIComponent(monitor.mac)}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" }
       });
@@ -100,7 +63,7 @@ export default function ManageMonitorCard({monitor, onDelete}) {
         throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
       }
 
-      Alert.alert("Success", `Monitor ${monitor.id} has been permanently deleted`);
+      Alert.alert("Success", `Monitor ${monitor.id} has been deleted`);
       
       // Call parent callback to refresh list
       if (onDelete) onDelete(monitor.id);
