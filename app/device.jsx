@@ -7,6 +7,7 @@ import { ScrollView } from "react-native-gesture-handler";
 import { VictoryAxis, VictoryChart, VictoryLine } from "victory-native";
 import GraphDropdown from "../components/graphDropdown.jsx";
 import StatusPill from "../components/StatusPill";
+import { getApiUrl } from "../utils/apiConfig.jsx";
 import useGetDevice from "../utils/getDevice.jsx";
 
 export default function Device () {
@@ -17,6 +18,7 @@ export default function Device () {
   const [timeRange,setTimeRange] = useState("24h")
   const [bucket, setBucket] = useState("10m");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [apiBase, setApiBase] = useState('');
   const yValues = graphPoints.map((point) => point.value);
   const hasNonZeroData = yValues.some((value) => value !== 0);
   const [min, setMin] = useState("-")
@@ -50,14 +52,19 @@ export default function Device () {
     });
   }, []);
 
+  // Load API URL on mount
+  useEffect(() => {
+    getApiUrl().then(setApiBase).catch(err => {
+      console.error('Failed to load API URL:', err);
+      setApiBase('');
+    });
+  }, []);
+
   useEffect(() => {
   if (!preferencesLoaded) return;
+  if (!apiBase) return; // Don't fetch if API URL is not loaded yet
   if (typeof mac !== "string" || mac.length === 0) return;
 
-  const apiBase =
-    process.env.EXPO_PUBLIC_API_BASE ||
-    Constants.expoConfig?.extra?.apiBase ||
-    "";
   const base = `${apiBase.replace(/\/$/, "")}/api/v1`;
   const url = `${base}/power?mac=${encodeURIComponent(
     mac
@@ -99,7 +106,7 @@ export default function Device () {
       setGraphPoints([]);
       
     });
-  }, [mac, timeRange, bucket, preferencesLoaded]);
+  }, [mac, timeRange, bucket, preferencesLoaded, apiBase]);
 
   const victoryPoints = graphPoints.map((p) => ({
         x: p.date,
