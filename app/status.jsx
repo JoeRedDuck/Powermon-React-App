@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from "react";
-import { ScrollView } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import DeviceCard from '../components/DeviceCard';
 import { getApiUrl } from "../utils/apiConfig";
 import sortDevices from '../utils/sortDevices';
@@ -13,6 +13,7 @@ export default function Status() {
   const [selectedLocation, setSelectedLocation] = useState(null)
   const [selectedMachineType, setSelectedMachineType] = useState(null)
   const [selectedStatus, setSelectedStatus] = useState(null)
+  const [hasError, setHasError] = useState(false)
   const TYPE_ORDER = ['IPM'];
   const LOCATION_ORDER = ['Production line'];
 
@@ -40,9 +41,13 @@ export default function Status() {
         
         const url = `${base}${params.toString() ? `?${params}` : ''}`;
         fetch(url)
-          .then(r => r.json())
+          .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+          })
           .then(data => {
             if (!mounted) return;
+            setHasError(false);
             if (Array.isArray(data)) setDevices(data);
             else if (data && Array.isArray(data.devices)) setDevices(data.devices);
             else setDevices([]);
@@ -50,6 +55,7 @@ export default function Status() {
           .catch(err => {
             if (!mounted) return;
             console.error('status fetch failed', err);
+            setHasError(true);
             setDevices([]);
           });
       };
@@ -63,6 +69,7 @@ export default function Status() {
       };
     }).catch(err => {
       console.error('Failed to load API URL:', err);
+      setHasError(true);
       setDevices([]);
     });
 
@@ -76,15 +83,45 @@ export default function Status() {
   return (
     <ScrollView
       contentContainerStyle={{
-        
         flexDirection: "column",
-        justifyContent: "flex-start",
+        justifyContent: orderedDevices.length === 0 ? "center" : "flex-start",
         alignItems: "center",
-        paddingVertical: 5
+        paddingVertical: 5,
+        flex: orderedDevices.length === 0 ? 1 : undefined
       }}
-      style={{flex: 1}}
+      style={{flex: 1, backgroundColor: "#F9FAFB"}}
     >
-      {orderedDevices.map(d => <DeviceCard key={d.mac} device={d} />)}
+      {hasError ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>No Connection</Text>
+          <Text style={styles.emptyText}>Unable to reach the server</Text>
+        </View>
+      ) : orderedDevices.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>No Devices</Text>
+          <Text style={styles.emptyText}>No devices match your filters</Text>
+        </View>
+      ) : (
+        orderedDevices.map(d => <DeviceCard key={d.mac} device={d} />)
+      )}
     </ScrollView>
   )
-} 
+}
+
+const styles = StyleSheet.create({
+  emptyState: {
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 40
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#111827"
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#6B7280"
+  }
+}) 

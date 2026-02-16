@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useGlobalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import ManageDeviceCard from "../components/ManageDeviceCard";
 import { getApiUrl } from "../utils/apiConfig";
 import sortDevices from "../utils/sortDevices";
@@ -10,6 +10,7 @@ import sortDevices from "../utils/sortDevices";
 export default function ManageDevices () {
   const [devices, setDevices] = useState([])
   const [apiBase, setApiBase] = useState('')
+  const [hasError, setHasError] = useState(false)
   const TYPE_ORDER = ["IPM"]
   const LOCATION_ORDER = ["Production line"]
   
@@ -39,14 +40,19 @@ export default function ManageDevices () {
     const url = `${base}${params.toString() ? `?${params}` : ''}`;
 
     fetch(url)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(data => {
+        setHasError(false);
         if (Array.isArray(data)) setDevices(data);
         else if (data && Array.isArray(data.devices)) setDevices(data.devices);
         else setDevices([]);
       })
       .catch(err => {
         console.error('status fetch failed', err);
+        setHasError(true);
         setDevices([]);
       });
   }, [selectedLocation, selectedStatus, selectedMachineType, base]);
@@ -80,8 +86,26 @@ export default function ManageDevices () {
   const orderedDevices = sortDevices(devices, TYPE_ORDER, LOCATION_ORDER)
 
   return (
-    <ScrollView style={styles.scrollView}>
-      {orderedDevices.map(d => <ManageDeviceCard key={d.mac} device={d} onDelete={handleDeleted} />)}
+    <ScrollView 
+      style={styles.scrollView}
+      contentContainerStyle={{
+        flexGrow: 1,
+        justifyContent: orderedDevices.length === 0 ? "center" : "flex-start"
+      }}
+    >
+      {hasError ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>No Connection</Text>
+          <Text style={styles.emptyText}>Unable to reach the server</Text>
+        </View>
+      ) : orderedDevices.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>No Devices</Text>
+          <Text style={styles.emptyText}>No devices match your filters</Text>
+        </View>
+      ) : (
+        orderedDevices.map(d => <ManageDeviceCard key={d.mac} device={d} onDelete={handleDeleted} />)
+      )}
     </ScrollView>
   )
 }
@@ -90,5 +114,20 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     backgroundColor: "#F9FAFB"
+  },
+  emptyState: {
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 40
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#111827"
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#6B7280"
   }
 })
