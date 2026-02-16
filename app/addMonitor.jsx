@@ -1,4 +1,4 @@
-import { Picker } from "@react-native-picker/picker";
+import PlatformPicker from "../components/PlatformPicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -224,23 +224,13 @@ export default function AddMonitor() {
 
       <View>
         <Text style={styles.label}>Assign to Machine (Optional):</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker
-            style={styles.selector}
-            dropdownIconColor="#111827"
-            selectedValue={selectedMachine}
-            onValueChange={(v) => setSelectedMachine(v)}>
-            
-            <Picker.Item label="No Machine (Leave Unassigned)" value="" />
-            {machines.map((machine) => (
-              <Picker.Item 
-                key={machine.name} 
-                label={machine.name} 
-                value={machine.name} 
-              />
-            ))}
-          </Picker>
-        </View>
+        <PlatformPicker
+          items={[{ label: 'No Machine (Leave Unassigned)', value: '' }, ...machines.map(m => ({ label: m.name, value: m.name }))]}
+          selectedValue={selectedMachine}
+          onValueChange={(v) => setSelectedMachine(v)}
+          style={styles.pickerWrapper}
+          selectorStyle={styles.selector}
+        />
       </View>
 
       <View>

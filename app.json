@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Powermon",
+    "name": "Prozomix Powermon",
     "slug": "Powermon",
     "owner": "joeredduck",
     "version": "1.0.0",
@@ -10,6 +10,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "buildNumber": "2",
       "supportsTablet": true,
       "bundleIdentifier": "com.prozomix.powermon",
       "infoPlist": {

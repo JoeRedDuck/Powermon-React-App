@@ -1,4 +1,4 @@
-import { Picker } from "@react-native-picker/picker";
+import PlatformPicker from "../components/PlatformPicker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -261,22 +261,13 @@ export default function AddDevice () {
       {isEdit && !mac ? (
         <View>
           <Text style={styles.label}>Select Monitor:</Text>
-          <View style={styles.pickerWrapper}>
-            <Picker
-              style={styles.selector}
-              dropdownIconColor="#111827"
-              selectedValue={id}
-              onValueChange={(v) => setID(v)}>
-              <Picker.Item label="No Monitor (Leave Unassigned)" value="" />
-              {availableMonitors.map((monitor) => (
-                <Picker.Item
-                  key={monitor.id}
-                  label={monitor.machine_name ? `Monitor ${monitor.id} (on ${monitor.machine_name})` : `Monitor ${monitor.id}`}
-                  value={String(monitor.id)}
-                />
-              ))}
-            </Picker>
-          </View>
+          <PlatformPicker
+            items={[{ label: 'No Monitor (Leave Unassigned)', value: '' }, ...availableMonitors.map(m => ({ label: m.machine_name ? `Monitor ${m.id} (on ${m.machine_name})` : `Monitor ${m.id}`, value: String(m.id) }))]}
+            selectedValue={id}
+            onValueChange={(v) => setID(v)}
+            style={styles.pickerWrapper}
+            selectorStyle={styles.selector}
+          />
         </View>
       ) : (
         <View>

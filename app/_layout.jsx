@@ -1,4 +1,4 @@
-import { Picker } from "@react-native-picker/picker";
+import PlatformPicker from "../components/PlatformPicker";
 import * as Notifications from "expo-notifications";
 import { router, Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import { useEffect, useState } from 'react';
@@ -93,64 +93,57 @@ export default function RootLayout() {
             <View style={{ flex: 1}}>
               <Stack screenOptions={{ headerShown: false }} />
               {filterOpen && (
-              <View style={{position: "absolute", top: 0, bottom: 0, left: 0, right: 0,  backgroundColor: "#F3F4F6"}}>
-                <View style={styles.form}>
-                  <Text style={styles.menuTitle}>Filter Options</Text>
+                <View style={styles.filterOverlay}>
+                  <View style={styles.filterCard}>
+                    <View style={styles.filterHeader}>
+                      <Text style={styles.filterTitle}>Filter Options</Text>
+                      <TouchableOpacity onPress={() => setFilterOpen(false)} style={styles.closeButton}>
+                        <Text style={styles.closeButtonText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
                   
-                  <View>
-                    <Text style={styles.label}>Status:</Text>
-                    <View style={styles.pickerWrapper}>
-                      <Picker
-                        style={styles.selector}
-                        dropdownIconColor="#111827"
+                    <View style={styles.filterSection}>
+                      <Text style={styles.label}>Status</Text>
+                      <PlatformPicker
+                        items={[{ label: 'All', value: '' }, ...statuses.map(s => ({ label: s, value: s }))]}
                         selectedValue={status}
-                        onValueChange={(v) => setStatus(v)}>
-                        <Picker.Item label="All" value="" />
-                        {statuses.map((type) => ( <Picker.Item key={type} label={type} value={type} />))}
-                      </Picker>
+                        onValueChange={(v) => setStatus(v)}
+                        style={styles.pickerWrapper}
+                        selectorStyle={styles.selector}
+                      />
                     </View>
-                  </View>
 
-                  <View>
-                    <Text style={styles.label}>Location:</Text>
-                    <View style={styles.pickerWrapper}>
-                      <Picker
-                        style={styles.selector}
-                        dropdownIconColor="#111827"
+                    <View style={styles.filterSection}>
+                      <Text style={styles.label}>Location</Text>
+                      <PlatformPicker
+                        items={[{ label: 'All', value: '' }, ...locations.map(l => ({ label: l, value: l }))]}
                         selectedValue={location}
-                        onValueChange={(v) => setLocation(v)}>
-                        <Picker.Item label="All" value="" />
-                        {locations.map((type) => ( <Picker.Item key={type} label={type} value={type} />))}
-                      </Picker>
+                        onValueChange={(v) => setLocation(v)}
+                        style={styles.pickerWrapper}
+                        selectorStyle={styles.selector}
+                      />
                     </View>
-                  </View>
 
-                  <View>
-                    <Text style={styles.label}>Machine Type:</Text>
-                    <View style={styles.pickerWrapper}>
-                      <Picker
-                        style={styles.selector}
-                        dropdownIconColor="#111827"
-                        selectedValue = {machine_type}
-                        onValueChange={(v) => setMachineType(v)}>
-
-                        <Picker.Item label="All" value="" />
-                        {machineTypes.map((type) => ( <Picker.Item key={type} label={type} value={type} /> ))}
-                        
-                      </Picker>
+                    <View style={styles.filterSection}>
+                      <Text style={styles.label}>Machine Type</Text>
+                      <PlatformPicker
+                        items={[{ label: 'All', value: '' }, ...machineTypes.map(t => ({ label: t, value: t }))]}
+                        selectedValue={machine_type}
+                        onValueChange={(v) => setMachineType(v)}
+                        style={styles.pickerWrapper}
+                        selectorStyle={styles.selector}
+                      />
                     </View>
-                  </View>
 
-                  <View>
                     <TouchableOpacity 
                       style={styles.applyButton}
                       onPress={applyFilters}>
-                      <Text style={styles.applyText}>Apply</Text>
+                      <Text style={styles.applyText}>Apply Filters</Text>
                     </TouchableOpacity>
-                  </View>
                   
+                  </View>
                 </View>
-              </View>)}
+              )}
             </View>
           <Bottombar />
         </SafeAreaView>
@@ -288,34 +281,78 @@ function Bottombar() {
 }
 
 const styles = StyleSheet.create({
-  label: {
-    fontSize: 20,
+  filterOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(15, 23, 36, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20
   },
-  form: {
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    gap: 20,
+  filterCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    width: "100%",
+    maxWidth: 500,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8
+  },
+  filterHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24
+  },
+  filterTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#111827"
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  closeButtonText: {
+    fontSize: 20,
+    color: "#6B7280",
+    fontWeight: "bold"
+  },
+  filterSection: {
+    marginBottom: 20
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8
   },
   pickerWrapper: {
     height: 45,
     borderColor: "#E5E7EB",
     borderWidth: 1,
     backgroundColor: "#FFFFFF",
-    borderRadius: 5,
+    borderRadius: 8,
     paddingHorizontal: 6,
-    marginTop: 10,
     justifyContent: "center"
-  },
-  menuTitle : {
-    fontSize: 30,
-    marginBottom: 10,
   },
   applyButton: {
     backgroundColor: "#2563EA",
-    height: 45,
+    height: 48,
     borderRadius: 10,
     justifyContent: "center",
-    alignItems: "center"
+    alignItems: "center",
+    marginTop: 8
   },
   applyText: {
     color: "#FFFFFF",
