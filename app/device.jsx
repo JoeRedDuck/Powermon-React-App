@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -14,7 +13,7 @@ export default function Device () {
   const {mac} = useLocalSearchParams();
   const [graphPoints, setGraphPoints] = useState([]);
   const device = useGetDevice(mac);
-  const currentPower = (device?.last_power != "offline") ? device?.last_power : "-"
+  const currentPower = device?.last_power && device.last_power !== "offline" ? device.last_power : "-"
   const [timeRange,setTimeRange] = useState("24h")
   const [bucket, setBucket] = useState("10m");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
@@ -76,14 +75,9 @@ export default function Device () {
   fetch(url)
     .then((response) => response.json())
     .then((data) => {
-      // Debug: log data summary
-      try {
-        const pts = Array.isArray(data.points) ? data.points : [];
-        console.log("[device] power response points:", pts.length);
-      } catch (e) {
-        console.log("[device] failed to inspect response", e);
-      }
-      const backendPoints = Array.isArray(data.points) ? data.points : [];
+      const backendPoints = data && Array.isArray(data.points) ? data.points : [];
+      console.log("[device] power response points:", backendPoints.length);
+
       const mapped = backendPoints.map((backendPoint) => ({
         value: Number(backendPoint.value),
         date: new Date(backendPoint.date),
@@ -97,14 +91,13 @@ export default function Device () {
         mapped.length
       );
       setGraphPoints(mapped);
-      setMin(data.min);
-      setMax(data.max);
-      setAverage(data.average);
+      setMin(typeof data?.min !== 'undefined' ? data.min : "-");
+      setMax(typeof data?.max !== 'undefined' ? data.max : "-");
+      setAverage(typeof data?.average !== 'undefined' ? data.average : "-");
     })
     .catch((error) => {
       console.error("power fetch failed", error);
       setGraphPoints([]);
-      
     });
   }, [mac, timeRange, bucket, preferencesLoaded, apiBase]);
 
@@ -263,7 +256,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 18,
     marginBottom: 10,
-    fontWeight: "450"
+    fontWeight: "500"
   },
   data: {
     fontSize: 18,
@@ -306,7 +299,6 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   content: {
-    gap: 10,
     paddingVertical: 10
   },
 }); 

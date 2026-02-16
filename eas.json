@@ -28,4 +28,13 @@
       }
     }
   }
+  ,
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "services@prozomix.com",
+        "appleTeamId": "AU457CP62K"
+      }
+    }
+  }
 }

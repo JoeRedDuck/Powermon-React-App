@@ -13,13 +13,13 @@ export default function MetricCard ( {type="offline", value = 0} ) {
     metricCard: {
     borderColor: "#E5E7EB",
     borderRadius: 11,
-    height: 160,
+    minHeight: 140,
+    flex: 1,
     backgroundColor: "#FFFFFF",
     flexDirection: "row"
     },
     accent: {
       width: 8,
-      height: 160,
       backgroundColor: palette.accentColour,
       borderTopLeftRadius: 11,
       borderBottomLeftRadius: 11

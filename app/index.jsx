@@ -51,8 +51,10 @@ const styles = StyleSheet.create({
   
   page: {
     paddingHorizontal: 16,
-    flex: 1,
-    justifyContent: "space-evenly"
+    paddingVertical: 12,
+    gap: 12,
+    flexGrow: 1,
+    justifyContent: "center"
   }
 })
 
