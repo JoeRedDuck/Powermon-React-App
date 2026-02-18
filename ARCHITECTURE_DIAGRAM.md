@@ -117,6 +117,61 @@
 
 ══════════════════════════════════════════════════════════════════════════
 
+3b. AUTHENTICATION TABLES
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                   users                                         │
+├─────┬──────────┬─────────────────────┬───────────────┬──────┬──────┬────────────┤
+│ id  │ username │ email               │ password_hash │ role │ ...  │ reset_code │
+├─────┼──────────┼─────────────────────┼───────────────┼──────┼──────┼────────────┤
+│  1  │ alice    │ alice@example.com   │ $argon2id$... │ user │      │ NULL       │
+│  2  │ bob      │ bob@example.com     │ $argon2id$... │ user │      │ NULL       │
+└─────┴──────────┴─────────────────────┴───────────────┴──────┴──────┴────────────┘
+
+┌──────────────────────────────────────────────────────────┐
+│                    refresh_tokens                         │
+├──────────────────────────┬─────────┬─────────────────────┤
+│ token                    │ user_id │ expiry              │
+├──────────────────────────┼─────────┼─────────────────────┤
+│ abc123...                │    1    │ 2026-02-25 12:00:00 │
+└──────────────────────────┴─────────┴─────────────────────┘
+        │
+        └─ FK → users.id (CASCADE DELETE)
+
+AUTH FLOW:
+  ┌──────────┐     POST /auth/register      ┌──────────┐
+  │  Client  │ ──────────────────────────▶   │  Server  │
+  │          │     { user, email, pass }     │          │
+  │          │                               │  Argon2  │
+  │          │     POST /auth/login          │  hash    │
+  │          │ ──────────────────────────▶   │  + store │
+  │          │  ◀── { access_token,          │          │
+  │          │       refresh_token }         │  JWT     │
+  │          │                               │  sign    │
+  │          │     GET /auth/me              │          │
+  │          │     Authorization: Bearer ... │          │
+  │          │ ──────────────────────────▶   │  JWT     │
+  │          │  ◀── { id, username, email }  │  verify  │
+  │          │                               │          │
+  │          │     POST /auth/refresh        │          │
+  │          │     { refresh_token }         │  lookup  │
+  │          │ ──────────────────────────▶   │  + sign  │
+  │          │  ◀── { new access_token }     │  new JWT │
+  └──────────┘                               └──────────┘
+
+RESET FLOW:
+  POST /auth/forgot-password { email }
+    → Generate itsdangerous token (1h expiry)
+    → Store in users.reset_code
+    → Return token (production: email it)
+  POST /auth/reset-password { reset_code, new_password }
+    → Validate and consume code (single-use)
+    → Argon2 hash new password
+    → Update users.password_hash
+
+
+══════════════════════════════════════════════════════════════════════════
+
 4. API ENDPOINTS OVERVIEW
 
 ┌──────────────────────────────────────────────────────────────────┐

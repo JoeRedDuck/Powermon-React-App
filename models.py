@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON  # type: ignore
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, JSON  # type: ignore
 from sqlalchemy.orm import relationship  # type: ignore
 from datetime import datetime
 from database import Base
@@ -60,3 +60,27 @@ class DeviceMutePreference(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow,
                         onupdate=datetime.utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    role = Column(String, default="user")
+    reset_code = Column(String, nullable=True)
+    reset_expiry = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow,
+                        onupdate=datetime.utcnow)
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+    token = Column(String, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    expiry = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    user = relationship("User")

@@ -476,7 +476,7 @@ def test_update_monitor_mac_with_polls(client):
     from datetime import datetime, timezone
     client.post("/api/v1/polls", json={
         "monitor_mac": "99:99:99:99:99:99",
-        "power_usage": 100.5,
+        "power_usage": 100,
         "poll_time": datetime.now(timezone.utc).isoformat()
     })
 

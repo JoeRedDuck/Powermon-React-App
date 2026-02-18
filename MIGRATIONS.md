@@ -203,6 +203,79 @@ If issues arise, you can temporarily modify queries to use the old logic:
 4. ✅ Run tests: `pytest -v`
 5. ✅ Monitor logs for foreign key constraint errors
 6. ✅ Verify alerting logic works as expected with machine-based grouping
+
+---
+
+# Authentication Tables Migration
+
+## Tables Added to `schema_v3.sql`
+
+### `users` table
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR UNIQUE NOT NULL,
+    email VARCHAR UNIQUE NOT NULL,
+    password_hash VARCHAR NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    role VARCHAR DEFAULT 'user',
+    reset_code VARCHAR DEFAULT NULL,
+    reset_expiry TIMESTAMP DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### `refresh_tokens` table
+```sql
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    token VARCHAR PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expiry TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT refresh_tokens_user_fkey
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+### Indexes
+```sql
+CREATE INDEX IF NOT EXISTS users_username_idx ON users (username);
+CREATE INDEX IF NOT EXISTS users_email_idx ON users (email);
+CREATE INDEX IF NOT EXISTS refresh_tokens_user_idx ON refresh_tokens (user_id);
+```
+
+## How to Apply
+If you already have an existing database:
+```sql
+-- Run these SQL statements against your production database
+-- They use IF NOT EXISTS so they're safe to re-run
+```
+
+Or re-run the full schema:
+```bash
+python setup_db.py
+```
+
+## Dependencies Added
+```
+argon2-cffi>=21.3.0
+PyJWT>=2.8.0
+itsdangerous>=2.0.0
+```
+
+Install them:
+```bash
+pip install -r requirements.txt
+```
+
+## Environment Variables (set for production)
+```bash
+JWT_SECRET=<random-64-char-string>
+SECRET_KEY=<random-64-char-string>
+```
+
+---
 # Machine Rename Fix - Included in Schema
 
 ## Problem

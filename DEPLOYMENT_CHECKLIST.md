@@ -12,6 +12,10 @@
 - [x] Setup script created
 - [x] Test suite created
 - [x] Documentation written
+ - [x] User account models and auth endpoints added
+ - [x] Password hashing (Argon2id) and JWT auth configured
+ - [x] Forgot-password / reset-password flow (itsdangerous tokens)
+ - [x] Refresh token storage and revocation on logout
 
 ### Testing
 - [ ] Run automated tests: `python3 test_mute_preferences.py`
@@ -20,6 +24,8 @@
 - [ ] Multiple device scenarios tested
 - [ ] Edge cases tested (non-existent machines, empty lists, etc.)
 - [ ] Database performance verified
+ - [x] Run auth tests: `pytest test_auth.py test_hash_helpers.py`
+ - [x] Verify password reset flow (single-use codes, old password invalidated)
 
 ### Code Review
 - [ ] All code changes reviewed
@@ -53,6 +59,10 @@
 - [ ] Test PUT endpoint (bulk replace)
 - [ ] Verify error responses (404 for non-existent machines)
 - [ ] Test with special characters in device_id/machine_name
+ - [ ] Test auth: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `GET /api/v1/auth/me`
+ - [ ] Test forgot/reset password: `POST /api/v1/auth/forgot-password`, `POST /api/v1/auth/reset-password`
+ - [ ] Verify logout invalidates refresh token
+ - [ ] Verify expired access tokens are rejected
 
 ### Notification Testing
 - [ ] Register test device with notification token

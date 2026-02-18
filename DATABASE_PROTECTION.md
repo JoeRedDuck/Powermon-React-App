@@ -100,11 +100,13 @@ TEST_PRODUCTION_DB=true python3 test_pg_machine_rename.py
 ```
 
 ## Files Modified
--  test_optional_mac.py - Uses SQLite test DB
+- ✅ test_optional_mac.py - Uses SQLite test DB
 - ✅ test_user_scenarios.py - Uses SQLite test DB
+- ✅ test_auth.py - Uses per-test in-memory SQLite via conftest fixture
+- ✅ test_hash_helpers.py - Uses per-test in-memory SQLite via conftest fixture
 - ✅ test_pg_machine_rename.py - Safety check added
 - ✅ pytest.ini - Excludes dangerous test
-- ✅ conftest.py - Safety hooks (NEW)
+- ✅ conftest.py - Safety hooks + per-test SQLite DB with StaticPool (NEW)
 - ✅ .gitignore - Excludes cache/test DBs (NEW)
 
 ## Result

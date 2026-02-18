@@ -228,9 +228,17 @@ If critical issues arise:
 | Alert Logic | ✅ VERIFIED | Already works correctly with machine grouping |
 | FK Constraints | ✅ PROTECTED | Validation + indexes + proper device creation |
 | Performance | ✅ OPTIMIZED | New indexes for machine-based queries |
-| Testing | ✅ COMPLETE | 17/17 tests passing |
+| Testing | ✅ COMPLETE | 110 tests passing |
 | Documentation | ✅ COMPLETE | Migration guide + examples |
+| Authentication | ✅ COMPLETE | Argon2 + JWT + refresh tokens + password reset |
 
-**Production Ready:** ✅ Yes, with external script updates required.
+**Authentication Notes:**
+- Passwords hashed with **Argon2id** (via `argon2-cffi`)
+- JWT access tokens (15 min default), refresh tokens stored server-side (7 day default)
+- Password reset uses **itsdangerous** time-safe tokens (1 hour expiry, single-use)
+- **Production requirement:** Set `JWT_SECRET` and `SECRET_KEY` environment variables to secure random values
+- Auth tests: `pytest test_auth.py test_hash_helpers.py` (25 tests)
+
+**Production Ready:** ✅ Yes, with external script updates and auth env var configuration required.
 
 **Critical Path:** Update external data collection scripts to include `machine_name` resolution.

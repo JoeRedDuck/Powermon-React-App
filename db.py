@@ -405,6 +405,89 @@ def reassign_monitor(db: Session, monitor_id: int, new_machine_name: str) -> boo
     return True
 
 
+# ---------------------------------------------------------------------------
+# User / auth helpers
+# ---------------------------------------------------------------------------
+
+
+def create_user(db: Session, username: str, email: str, password_hash: str) -> Dict[str, Any]:
+    """Create a new user and return the user dict."""
+    user = models.User(username=username, email=email, password_hash=password_hash)
+    db.add(user)
+    try:
+        db.commit()
+        db.refresh(user)
+        return {"id": user.id, "username": user.username, "email": user.email}
+    except IntegrityError:
+        db.rollback()
+        raise
+
+
+def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
+    return db.query(models.User).filter(models.User.username == username).first()
+
+
+def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
+    return db.query(models.User).filter(models.User.email == email).first()
+
+
+def update_user_password(db: Session, user_id: int, new_password_hash: str) -> bool:
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        return False
+    user.password_hash = new_password_hash
+    user.reset_code = None
+    user.reset_expiry = None
+    db.commit()
+    return True
+
+
+def set_reset_code(db: Session, user_id: int, code: str, expiry) -> bool:
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        return False
+    user.reset_code = code
+    user.reset_expiry = expiry
+    db.commit()
+    return True
+
+
+def consume_reset_code(db: Session, code: str) -> Optional[models.User]:
+    user = db.query(models.User).filter(models.User.reset_code == code).first()
+    if not user:
+        return None
+    # Check expiry
+    if user.reset_expiry is None or user.reset_expiry < datetime.utcnow():
+        return None
+    # Clear code (consumed)
+    user.reset_code = None
+    user.reset_expiry = None
+    db.commit()
+    return user
+
+
+def store_refresh_token(db: Session, token: str, user_id: int, expiry) -> None:
+    rt = models.RefreshToken(token=token, user_id=user_id, expiry=expiry)
+    db.add(rt)
+    db.commit()
+
+
+def get_refresh_token(db: Session, token: str) -> Optional[models.RefreshToken]:
+    return db.query(models.RefreshToken).filter(models.RefreshToken.token == token).first()
+
+
+def delete_refresh_token(db: Session, token: str) -> None:
+    rt = db.query(models.RefreshToken).filter(models.RefreshToken.token == token).first()
+    if rt:
+        db.delete(rt)
+        db.commit()
+
+
+def delete_refresh_tokens_for_user(db: Session, user_id: int) -> None:
+    db.query(models.RefreshToken).filter(models.RefreshToken.user_id == user_id).delete()
+    db.commit()
+
+
 def update_device(db: Session, mac: str, device_data) -> bool:
     monitor = db.query(models.Monitor).filter(
         models.Monitor.mac == mac).first()

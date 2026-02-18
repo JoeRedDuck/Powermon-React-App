@@ -25,6 +25,13 @@ import urllib3  # type: ignore
 import warnings
 import os
 import sys
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
+from itsdangerous import URLSafeTimedSerializer
+import jwt
+import secrets
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import status
 # Suppress OpenSSL warnings at the C library level
 os.environ['PYTHONWARNINGS'] = 'ignore'
 os.environ['PYTHONHTTPSVERIFY'] = '0'
@@ -44,6 +51,17 @@ warnings.filterwarnings('ignore')
 load_dotenv()
 UPS_CMD = shutil.which("upsc") or "/usr/bin/upsc"
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+
+# Auth configuration
+JWT_SECRET = os.getenv("JWT_SECRET", "dev_jwt_secret_change_this")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+ph = PasswordHasher()
+RESET_SALT = os.getenv("RESET_SALT", "password-reset")
+serializer = URLSafeTimedSerializer(os.getenv("SECRET_KEY", "dev_secret_change_me"))
+security = HTTPBearer()
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=[
@@ -148,6 +166,78 @@ class MonitorUpdate(BaseModel):
         if v is not None and (not v or not v.strip()):
             raise ValueError('MAC address cannot be empty')
         return v.strip() if v else None
+
+# --- Auth models & helpers ---
+
+
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str | None = None
+    token_type: str = "bearer"
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    reset_code: str
+    new_password: str
+
+
+def hash_password(password: str) -> str:
+    return ph.hash(password)
+
+
+def verify_password(hash_value: str, password: str) -> bool:
+    try:
+        return ph.verify(hash_value, password)
+    except VerifyMismatchError:
+        return False
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def create_refresh_token_value() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
+
+    user = db.get(models.User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user
 
 # --- Helpers ---
 
@@ -416,6 +506,90 @@ def health(session: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=503, detail={
                             "status": "db_down", "reason": str(e)})
+
+
+@app.post("/api/v1/auth/register", response_model=dict)
+def register(user: UserCreate, session: Session = Depends(get_db)):
+    # Basic validation
+    if len(user.password) < 8:
+        raise HTTPException(status_code=400, detail={"status": "weak_password"})
+    # Hash password
+    pwd = hash_password(user.password)
+    try:
+        created = db.create_user(session, user.username, user.email, pwd)
+        return {"status": "created", "user": created}
+    except Exception as e:
+        # IntegrityError likely: duplicate username/email
+        raise HTTPException(status_code=400, detail={"status": "duplicate", "reason": str(e)})
+
+
+@app.post("/api/v1/auth/login", response_model=TokenResponse)
+def login(creds: UserLogin, session: Session = Depends(get_db)):
+    user = db.get_user_by_username(session, creds.username)
+    if not user or not verify_password(user.password_hash, creds.password):
+        raise HTTPException(status_code=401, detail={"status": "invalid_credentials"})
+
+    access_payload = {"user_id": user.id, "username": user.username}
+    access_token = create_access_token(access_payload)
+
+    # Create refresh token server-side
+    refresh_value = create_refresh_token_value()
+    refresh_expiry = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    db.store_refresh_token(session, refresh_value, user.id, refresh_expiry)
+
+    return TokenResponse(access_token=access_token, refresh_token=refresh_value)
+
+
+@app.post("/api/v1/auth/refresh", response_model=TokenResponse)
+def refresh_token(req: RefreshRequest, session: Session = Depends(get_db)):
+    rt = db.get_refresh_token(session, req.refresh_token)
+    if not rt or rt.expiry < datetime.utcnow():
+        raise HTTPException(status_code=401, detail={"status": "invalid_refresh"})
+    user = session.get(models.User, rt.user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail={"status": "invalid_refresh"})
+
+    access_payload = {"user_id": user.id, "username": user.username}
+    access_token = create_access_token(access_payload)
+    return TokenResponse(access_token=access_token, refresh_token=req.refresh_token)
+
+
+@app.post("/api/v1/auth/logout")
+def logout(req: RefreshRequest, session: Session = Depends(get_db)):
+    db.delete_refresh_token(session, req.refresh_token)
+    return {"status": "logged_out"}
+
+
+@app.post("/api/v1/auth/forgot-password")
+def forgot_password(req: ForgotPasswordRequest, session: Session = Depends(get_db)):
+    user = db.get_user_by_email(session, req.email)
+    if not user:
+        # Do not reveal existence
+        return {"status": "ok"}
+    code = serializer.dumps(user.email, salt=RESET_SALT)
+    expiry = datetime.utcnow() + timedelta(hours=1)
+    db.set_reset_code(session, user.id, code, expiry)
+    # In production send email. For now, return code for testing.
+    return {"status": "ok", "reset_code": code}
+
+
+@app.post("/api/v1/auth/reset-password")
+def reset_password(req: ResetPasswordRequest, session: Session = Depends(get_db)):
+    user = db.consume_reset_code(session, req.reset_code)
+    if not user:
+        raise HTTPException(status_code=400, detail={"status": "invalid_or_expired_code"})
+    if len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail={"status": "weak_password"})
+    new_hash = hash_password(req.new_password)
+    updated = db.update_user_password(session, user.id, new_hash)
+    if not updated:
+        raise HTTPException(status_code=500, detail={"status": "update_failed"})
+    return {"status": "ok"}
+
+
+@app.get("/api/v1/auth/me")
+def me(current_user: models.User = Depends(get_current_user)):
+    return {"id": current_user.id, "username": current_user.username, "email": current_user.email}
 
 
 @app.get("/api/v1/devices")

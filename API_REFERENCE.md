@@ -399,6 +399,205 @@ DELETE /api/v1/notifications/tokens/ExponentPushToken[xxxxxxxxxxxxx]
 
 ---
 
+## 🔐 Authentication
+
+All auth endpoints use **Argon2id** for password hashing and **JWT (HS256)** for access tokens.
+Refresh tokens are stored server-side and can be revoked via logout.
+Password reset uses **itsdangerous** time-safe tokens (valid for 1 hour).
+
+### Register
+```
+POST /api/v1/auth/register
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{
+  "username": "alice",
+  "email": "alice@example.com",
+  "password": "s3curepa$$"
+}
+```
+
+**Response (200):**
+```json
+{
+  "status": "created",
+  "user": { "id": 1, "username": "alice", "email": "alice@example.com" }
+}
+```
+
+**Error (400):**
+```json
+{ "detail": { "status": "weak_password" } }
+```
+```json
+{ "detail": { "status": "duplicate", "reason": "..." } }
+```
+
+**Notes:**
+- Password must be at least 8 characters
+- Username and email must be unique
+
+---
+
+### Login
+```
+POST /api/v1/auth/login
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "username": "alice", "password": "s3curepa$$" }
+```
+
+**Response (200):**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "abc123...",
+  "token_type": "bearer"
+}
+```
+
+**Error (401):**
+```json
+{ "detail": { "status": "invalid_credentials" } }
+```
+
+**Notes:**
+- Access token expires after 15 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
+- Refresh token expires after 7 days (configurable via `REFRESH_TOKEN_EXPIRE_DAYS`)
+
+---
+
+### Refresh Access Token
+```
+POST /api/v1/auth/refresh
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "refresh_token": "abc123..." }
+```
+
+**Response (200):**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "abc123...",
+  "token_type": "bearer"
+}
+```
+
+**Error (401):**
+```json
+{ "detail": { "status": "invalid_refresh" } }
+```
+
+---
+
+### Logout
+```
+POST /api/v1/auth/logout
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "refresh_token": "abc123..." }
+```
+
+**Response (200):**
+```json
+{ "status": "logged_out" }
+```
+
+**Notes:**
+- Deletes the refresh token server-side so it cannot be reused
+
+---
+
+### Forgot Password
+```
+POST /api/v1/auth/forgot-password
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "email": "alice@example.com" }
+```
+
+**Response (200):**
+```json
+{ "status": "ok", "reset_code": "..." }
+```
+
+**Notes:**
+- Always returns `{ "status": "ok" }` even if the email doesn't exist (prevents user enumeration)
+- Reset code is generated using `itsdangerous.URLSafeTimedSerializer` and is valid for 1 hour
+- In production, the reset code should be emailed instead of returned in the response
+
+---
+
+### Reset Password
+```
+POST /api/v1/auth/reset-password
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "reset_code": "...", "new_password": "newPa$$w0rd" }
+```
+
+**Response (200):**
+```json
+{ "status": "ok" }
+```
+
+**Error (400):**
+```json
+{ "detail": { "status": "invalid_or_expired_code" } }
+```
+```json
+{ "detail": { "status": "weak_password" } }
+```
+
+**Notes:**
+- Reset codes are single-use; consumed on successful reset
+- New password must be at least 8 characters
+
+---
+
+### Get Current User
+```
+GET /api/v1/auth/me
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{ "id": 1, "username": "alice", "email": "alice@example.com" }
+```
+
+**Error (401):**
+```json
+{ "detail": "Token expired" }
+```
+```json
+{ "detail": "Invalid authentication token" }
+```
+
+**Notes:**
+- Requires a valid JWT access token in the `Authorization: Bearer` header
+
+---
+
 ## 🔕 Mute Preferences (Per-Device)
 
 ### Get Muted Machines
@@ -788,6 +987,15 @@ await POST('/api/v1/muted-machines', {
 ---
 
 ## 📝 Quick Reference
+
+**Authentication:**
+- Register: `POST /api/v1/auth/register`
+- Login: `POST /api/v1/auth/login`
+- Refresh: `POST /api/v1/auth/refresh`
+- Logout: `POST /api/v1/auth/logout`
+- Forgot password: `POST /api/v1/auth/forgot-password`
+- Reset password: `POST /api/v1/auth/reset-password`
+- Current user: `GET /api/v1/auth/me` (requires `Authorization: Bearer <token>`)
 
 **Base CRUD:**
 - List: `GET /api/v1/devices`

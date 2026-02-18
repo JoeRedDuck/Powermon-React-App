@@ -2,10 +2,21 @@
 """
 Test script for device mute preferences functionality.
 Tests all API endpoints and database operations.
+
+NOTE: This is an integration test that requires a running server at localhost:8000.
+      It is skipped by default during `pytest` runs. Start the server first, then
+      run with: TEST_INTEGRATION=true pytest test_mute_preferences.py
 """
 
+import os
+import pytest
 import requests
 import json
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("TEST_INTEGRATION") != "true",
+    reason="Integration test – requires a running server (TEST_INTEGRATION=true)"
+)
 
 BASE_URL = "http://localhost:8000"
 

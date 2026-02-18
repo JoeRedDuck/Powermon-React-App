@@ -105,9 +105,70 @@ GET /api/v1/power?mac=AA:BB:CC:DD:EE:FF&time_range=1h&bucket=1m
 
 ---
 
+## � Authentication
+
+### 7. Register Account
+```javascript
+POST /api/v1/auth/register
+{
+  "username": "alice",
+  "email": "alice@example.com",
+  "password": "s3curePass!"     // min 8 characters
+}
+// Response: { "status": "created", "user": { "id": 1, "username": "alice", ... } }
+```
+
+### 8. Login
+```javascript
+POST /api/v1/auth/login
+{
+  "username": "alice",
+  "password": "s3curePass!"
+}
+// Response: { "access_token": "eyJ...", "refresh_token": "abc...", "token_type": "bearer" }
+// Store both tokens securely (e.g., SecureStore in React Native)
+```
+
+### 9. Make Authenticated Requests
+```javascript
+// Include the access token in the Authorization header
+GET /api/v1/auth/me
+Headers: { "Authorization": "Bearer eyJ..." }
+// Response: { "id": 1, "username": "alice", "email": "alice@example.com" }
+```
+
+### 10. Refresh Token (when access token expires)
+```javascript
+POST /api/v1/auth/refresh
+{ "refresh_token": "abc..." }
+// Response: { "access_token": "new_eyJ...", "refresh_token": "abc...", "token_type": "bearer" }
+```
+
+### 11. Logout
+```javascript
+POST /api/v1/auth/logout
+{ "refresh_token": "abc..." }
+// Response: { "status": "logged_out" }
+```
+
+### 12. Forgot / Reset Password
+```javascript
+// Step 1: Request reset code (always returns ok even if email doesn't exist)
+POST /api/v1/auth/forgot-password
+{ "email": "alice@example.com" }
+// Response: { "status": "ok", "reset_code": "..." }
+
+// Step 2: Reset password with code
+POST /api/v1/auth/reset-password
+{ "reset_code": "...", "new_password": "newPass123!" }
+// Response: { "status": "ok" }
+```
+
+---
+
 ## 🔔 Push Notifications
 
-### 7. Register Device for Notifications
+### 13. Register Device for Notifications
 ```javascript
 POST /api/v1/notifications/register
 {
@@ -116,7 +177,7 @@ POST /api/v1/notifications/register
 }
 ```
 
-### 8. Mute a Machine
+### 14. Mute a Machine
 ```javascript
 POST /api/v1/muted-machines
 {

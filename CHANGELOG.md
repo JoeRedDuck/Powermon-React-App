@@ -1,3 +1,53 @@
+# Changelog
+
+## Authentication System (February 2026)
+
+### Added
+- **User account system** with registration, login, and session management
+- **Password hashing** using **Argon2id** (`argon2-cffi`) — industry-recommended algorithm
+- **JWT access tokens** (15 min expiry, HS256) via `PyJWT`
+- **Server-side refresh tokens** (7 day expiry) stored in `refresh_tokens` table
+- **Forgot-password / reset-password flow** using **itsdangerous** `URLSafeTimedSerializer` (1 hour expiry, single-use codes)
+- 7 new API endpoints:
+  - `POST /api/v1/auth/register` — create account
+  - `POST /api/v1/auth/login` — get access + refresh tokens
+  - `POST /api/v1/auth/refresh` — get new access token
+  - `POST /api/v1/auth/logout` — revoke refresh token
+  - `POST /api/v1/auth/forgot-password` — generate reset code
+  - `POST /api/v1/auth/reset-password` — consume reset code and update password
+  - `GET /api/v1/auth/me` — get current user info (requires Bearer token)
+- Database tables: `users`, `refresh_tokens` (added to `schema_v3.sql`)
+- SQLAlchemy models: `User`, `RefreshToken` (in `models.py`)
+- DB helper functions in `db.py`: `create_user`, `get_user_by_username`, `get_user_by_email`, `update_user_password`, `set_reset_code`, `consume_reset_code`, `store_refresh_token`, `get_refresh_token`, `delete_refresh_token`, `delete_refresh_tokens_for_user`
+- `get_current_user()` FastAPI dependency for protecting endpoints
+- Comprehensive test suites: `test_auth.py` (19 tests) and `test_hash_helpers.py` (6 tests)
+
+### Fixed
+- `User.is_active` model field changed from `String` to `Boolean`
+- `reassign_monitor()` in `db.py` was broken (auth helper functions were inserted in the middle of it, separating the return statement)
+- Test infrastructure: added `conftest.py` autouse fixture that creates a fresh SQLite in-memory database per test with `StaticPool` so all sessions share the same connection
+- `test_monitor_id_validation.py` — tests now match actual validator behavior (<=0 treated as None)
+- `test_api.py` — fixed poll creation test using float instead of int for `power_usage`
+- `test_mute_preferences.py` — marked as integration test (skipped by default, requires running server)
+- Removed unused `passlib[bcrypt]` dependency from `requirements.txt`
+
+### Dependencies Added
+- `argon2-cffi>=21.3.0` — Argon2id password hashing
+- `PyJWT>=2.8.0` — JWT token creation and verification
+- `itsdangerous>=2.0.0` — time-safe reset token serialization
+
+### Configuration (Environment Variables)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JWT_SECRET` | `dev_jwt_secret_change_this` | **Change in production** |
+| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | Access token lifetime |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime |
+| `SECRET_KEY` | `dev_secret_change_me` | **Change in production** — itsdangerous serializer key |
+| `RESET_SALT` | `password-reset` | itsdangerous salt |
+
+---
+
 # Bug Fix Summary - Device Edit Issue
 
 ## Critical Bug Fixed
