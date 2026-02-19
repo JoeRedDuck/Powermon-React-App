@@ -294,6 +294,29 @@ GET /api/v1/power?mac=AA:BB:CC:DD:EE:FF&time_range=1h&bucket=1m
 
 ---
 
+### Check Poll Count
+```
+POST /api/v1/checkPoll/{mac}
+```
+
+**Returns the number of poll records for a given device (by MAC address).**
+
+**Example:**
+```
+POST /api/v1/checkPoll/AA:BB:CC:DD:EE:FF
+```
+
+**Response:**
+```json
+{
+  "count": 1523
+}
+```
+
+**Use Case:** Check if a device has historical data before displaying charts or deleting
+
+---
+
 ### Insert Poll Data
 ```
 POST /api/v1/polls
@@ -518,6 +541,40 @@ Content-Type: application/json
 
 **Notes:**
 - Deletes the refresh token server-side so it cannot be reused
+
+---
+
+### Delete Account
+```
+DELETE /api/v1/auth/account
+Authorization: Bearer <access_token>
+```
+
+**Request:**
+No body required
+
+**Response (200):**
+```json
+{ "status": "deleted" }
+```
+
+**Error Responses:**
+
+*Unauthorized (401):*
+```json
+{ "detail": "Not authenticated" }
+```
+
+*Server Error (500):*
+```json
+{ "detail": { "status": "delete_failed" } }
+```
+
+**Notes:**
+- Requires authentication via Bearer token
+- Permanently deletes the user account and all associated refresh tokens
+- This action cannot be undone
+- The user will need to register a new account to use the system again
 
 ---
 
@@ -996,6 +1053,7 @@ await POST('/api/v1/muted-machines', {
 - Forgot password: `POST /api/v1/auth/forgot-password`
 - Reset password: `POST /api/v1/auth/reset-password`
 - Current user: `GET /api/v1/auth/me` (requires `Authorization: Bearer <token>`)
+- Delete account: `DELETE /api/v1/auth/account` (requires `Authorization: Bearer <token>`)
 
 **Base CRUD:**
 - List: `GET /api/v1/devices`

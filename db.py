@@ -412,7 +412,7 @@ def reassign_monitor(db: Session, monitor_id: int, new_machine_name: str) -> boo
 
 def create_user(db: Session, username: str, email: str, password_hash: str) -> Dict[str, Any]:
     """Create a new user and return the user dict."""
-    user = models.User(username=username, email=email, password_hash=password_hash)
+    user = models.User(username=username.lower(), email=email, password_hash=password_hash)
     db.add(user)
     try:
         db.commit()
@@ -424,7 +424,7 @@ def create_user(db: Session, username: str, email: str, password_hash: str) -> D
 
 
 def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
-    return db.query(models.User).filter(models.User.username == username).first()
+    return db.query(models.User).filter(models.User.username == username.lower()).first()
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
@@ -486,6 +486,19 @@ def delete_refresh_token(db: Session, token: str) -> None:
 def delete_refresh_tokens_for_user(db: Session, user_id: int) -> None:
     db.query(models.RefreshToken).filter(models.RefreshToken.user_id == user_id).delete()
     db.commit()
+
+
+def delete_user(db: Session, user_id: int) -> bool:
+    """Delete a user account and all associated refresh tokens."""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        return False
+    # Delete all refresh tokens for this user (CASCADE will handle this, but explicit is better)
+    delete_refresh_tokens_for_user(db, user_id)
+    # Delete the user
+    db.delete(user)
+    db.commit()
+    return True
 
 
 def update_device(db: Session, mac: str, device_data) -> bool:

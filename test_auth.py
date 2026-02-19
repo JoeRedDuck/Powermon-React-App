@@ -184,3 +184,43 @@ def test_reset_password_weak_new_password():
     r = client.post("/api/v1/auth/reset-password", json={"reset_code": code, "new_password": "short"})
     assert r.status_code == 400
     assert "weak_password" in str(r.json())
+
+
+# ── delete account ─────────────────────────────────────────────────────────
+
+def test_delete_account_success():
+    """Test successful account deletion."""
+    _register(ALICE)
+    login_r = _login("alice", ALICE["password"])
+    token = login_r.json()["access_token"]
+    
+    # Delete the account
+    r = client.delete("/api/v1/auth/account", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "deleted"
+    
+    # Should not be able to login anymore
+    r2 = _login("alice", ALICE["password"])
+    assert r2.status_code == 401
+
+
+def test_delete_account_no_auth():
+    """Test that delete account requires authentication."""
+    r = client.delete("/api/v1/auth/account")
+    assert r.status_code in [401, 403]
+
+
+def test_delete_account_removes_refresh_tokens():
+    """Test that deleting account also removes all refresh tokens."""
+    _register(ALICE)
+    login_r = _login("alice", ALICE["password"])
+    access_token = login_r.json()["access_token"]
+    refresh_token = login_r.json()["refresh_token"]
+    
+    # Delete the account
+    r = client.delete("/api/v1/auth/account", headers={"Authorization": f"Bearer {access_token}"})
+    assert r.status_code == 200
+    
+    # Refresh token should no longer work
+    r2 = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert r2.status_code == 401

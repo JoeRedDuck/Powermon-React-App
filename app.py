@@ -592,6 +592,15 @@ def me(current_user: models.User = Depends(get_current_user)):
     return {"id": current_user.id, "username": current_user.username, "email": current_user.email}
 
 
+@app.delete("/api/v1/auth/account")
+def delete_account(current_user: models.User = Depends(get_current_user), session: Session = Depends(get_db)):
+    """Delete the authenticated user's account and all associated data."""
+    success = db.delete_user(session, current_user.id)
+    if not success:
+        raise HTTPException(status_code=500, detail={"status": "delete_failed"})
+    return {"status": "deleted"}
+
+
 @app.get("/api/v1/devices")
 def list_devices(session: Session = Depends(
     get_db)): return db.get_devices(session)

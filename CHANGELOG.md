@@ -8,7 +8,8 @@
 - **JWT access tokens** (15 min expiry, HS256) via `PyJWT`
 - **Server-side refresh tokens** (7 day expiry) stored in `refresh_tokens` table
 - **Forgot-password / reset-password flow** using **itsdangerous** `URLSafeTimedSerializer` (1 hour expiry, single-use codes)
-- 7 new API endpoints:
+- **Account deletion** — users can delete their own accounts via authenticated endpoint
+- 8 new API endpoints:
   - `POST /api/v1/auth/register` — create account
   - `POST /api/v1/auth/login` — get access + refresh tokens
   - `POST /api/v1/auth/refresh` — get new access token
@@ -16,11 +17,13 @@
   - `POST /api/v1/auth/forgot-password` — generate reset code
   - `POST /api/v1/auth/reset-password` — consume reset code and update password
   - `GET /api/v1/auth/me` — get current user info (requires Bearer token)
+  - `DELETE /api/v1/auth/account` — delete current user account (requires Bearer token)
 - Database tables: `users`, `refresh_tokens` (added to `schema_v3.sql`)
 - SQLAlchemy models: `User`, `RefreshToken` (in `models.py`)
-- DB helper functions in `db.py`: `create_user`, `get_user_by_username`, `get_user_by_email`, `update_user_password`, `set_reset_code`, `consume_reset_code`, `store_refresh_token`, `get_refresh_token`, `delete_refresh_token`, `delete_refresh_tokens_for_user`
+- DB helper functions in `db.py`: `create_user`, `get_user_by_username`, `get_user_by_email`, `update_user_password`, `set_reset_code`, `consume_reset_code`, `store_refresh_token`, `get_refresh_token`, `delete_refresh_token`, `delete_refresh_tokens_for_user`, `delete_user`
 - `get_current_user()` FastAPI dependency for protecting endpoints
-- Comprehensive test suites: `test_auth.py` (19 tests) and `test_hash_helpers.py` (6 tests)
+- Comprehensive test suites: `test_auth.py` (22 tests) and `test_hash_helpers.py` (6 tests)
+- **Case-insensitive usernames** — usernames are automatically lowercased during registration and login
 
 ### Fixed
 - `User.is_active` model field changed from `String` to `Boolean`
