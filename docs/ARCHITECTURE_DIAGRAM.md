@@ -341,8 +341,8 @@ All components of the device-specific mute preferences system have been successf
   - `device_id` (unique, indexed)
   - `muted_machines` (JSON array)
   - `created_at`, `updated_at` (timestamps)
-- **Migration Script:** `migrations/add_device_mute_preferences.sql`
-- **Setup Script:** `create_mute_preferences_table.py`
+- **Schema:** Defined in `models.py` as `DeviceMutePreference` model
+- **Setup:** Created by running `setup_db.py`
 
 ### 2. Database Operations ✅
 Added to `db.py`:

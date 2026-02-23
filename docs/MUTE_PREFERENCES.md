@@ -193,21 +193,13 @@ async function toggleMute(machineId) {
 ## 🗂️ Files Created
 
 ### Core Implementation
-- [models.py](models.py) - Added `DeviceMutePreference` model
-- [db.py](db.py) - Added database functions
-- [app.py](app.py) - Added API endpoints + notification filtering
+- [models.py](../models.py) - Added `DeviceMutePreference` model
+- [db.py](../db.py) - Added database functions
+- [app.py](../app.py) - Added API endpoints + notification filtering
+- [setup_db.py](../setup_db.py) - Creates all tables including `device_mute_preferences`
 
-### Database
-- [migrations/add_device_mute_preferences.sql](migrations/add_device_mute_preferences.sql) - SQL migration script
-- [create_mute_preferences_table.py](create_mute_preferences_table.py) - Python setup script
-
-### Testing & Setup
-- [test_mute_preferences.py](test_mute_preferences.py) - Comprehensive test suite
-- [setup_mute_preferences.sh](setup_mute_preferences.sh) - One-click setup script
-
-### Documentation
-- [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) - Quick reference ⭐ Start here
-- [MUTE_PREFERENCES_GUIDE.md](MUTE_PREFERENCES_GUIDE.md) - Complete implementation guide
+### Testing
+- [test_mute_preferences.py](../test_mute_preferences.py) - Comprehensive test suite
 - [ARCHITECTURE_DIAGRAM.md](ARCHITECTURE_DIAGRAM.md) - System architecture and flow
 - **README_MUTE_PREFERENCES.md** - This file (quick start)
 
@@ -673,15 +665,12 @@ send_expo_notification(title, body, priority="high", machine_names=affected_mach
 
 ### 1. Create Database Table
 
-**Option A: Using SQLAlchemy (Recommended)**
+**Run setup_db.py to create all tables:**
 ```bash
-python create_mute_preferences_table.py
+python setup_db.py
 ```
 
-**Option B: Using SQL Migration**
-```bash
-psql -U your_user -d your_database -f migrations/add_device_mute_preferences.sql
-```
+This will create all tables including `device_mute_preferences` with proper schema.
 
 ### 2. Verify Installation
 
