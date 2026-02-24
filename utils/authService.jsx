@@ -52,11 +52,23 @@ export async function clearAuth() {
 }
 
 /**
- * Check if user is logged in (has tokens stored)
+ * Check if user is logged in by validating the refresh token.
+ * Attempts a token refresh on startup — clears auth and returns false if the
+ * session is expired or revoked on the server.
  */
 export async function isLoggedIn() {
   const refreshToken = await getRefreshToken();
-  return !!refreshToken;
+  if (!refreshToken) return false;
+
+  // Validate the refresh token is still accepted by the server
+  const newToken = await refreshAccessToken();
+  if (!newToken) {
+    // Token is expired/revoked — clear stale auth data
+    await clearAuth();
+    return false;
+  }
+
+  return true;
 }
 
 /**

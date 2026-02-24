@@ -106,8 +106,11 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     const receiveSub = Notifications.addNotificationReceivedListener((notification) => {
       const payload = notification.request.content;
+      // Use a composite ID to guarantee uniqueness across platforms and app restarts
+      // request.identifier is not guaranteed unique for remote pushes on Android
+      const compositeId = `${notification.request.identifier}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const newNotification = {
-        id: notification.request.identifier,
+        id: compositeId,
         title: payload.title || "",
         body: payload.body || "",
         data: payload.data || {},
