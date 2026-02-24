@@ -1,8 +1,7 @@
-import PlatformPicker from "../components/PlatformPicker";
 import * as Notifications from "expo-notifications";
 import { router, Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackIcon from "../assets/icons/arrow-left.svg";
@@ -13,7 +12,11 @@ import MenuIcon from "../assets/icons/menu.svg";
 import AddDeviceIcon from "../assets/icons/plus-circle.svg";
 import ManageDevicesIcon from "../assets/icons/settings.svg";
 import FilterIcon from "../assets/icons/sliders.svg";
+import LoginScreen from "../components/LoginScreen";
+import PlatformPicker from "../components/PlatformPicker";
 import { getApiUrl } from "../utils/apiConfig";
+import { AuthProvider } from "../utils/AuthContext";
+import { deleteAccount as authDeleteAccount, logout as authLogout, isLoggedIn } from "../utils/authService";
 import useGetDevice from "../utils/getDevice.jsx";
 import { NotificationProvider } from "../utils/NotificationContext";
 
@@ -27,6 +30,8 @@ Notifications.setNotificationHandler({
 });
 
 export default function RootLayout() {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [machineTypes, setMachineTypes] = useState([])
   const [locations, setLocations] = useState([])
@@ -38,6 +43,14 @@ export default function RootLayout() {
   const [location, setLocation] = useState("")
   const [status, setStatus] = useState("")
   const [machine_type, setMachineType] = useState("")
+
+  // Check auth on mount
+  useEffect(() => {
+    isLoggedIn().then(loggedIn => {
+      setAuthenticated(loggedIn);
+      setAuthChecked(true);
+    });
+  }, []);
 
   useEffect(() => {
     if (pathname !== "/status" && pathname !== "/manageDevices" && filterOpen) setFilterOpen(false)
@@ -85,7 +98,42 @@ export default function RootLayout() {
     setFilterOpen(false); 
   }
 
+  // Show loading spinner while checking auth
+  if (!authChecked) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={{ backgroundColor: "#0F1724", flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#2563EA" />
+        </SafeAreaView>
+      </GestureHandlerRootView>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!authenticated) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={{ backgroundColor: "#0F1724", flex: 1 }}>
+          <LoginScreen onLoginSuccess={() => setAuthenticated(true)} />
+        </SafeAreaView>
+      </GestureHandlerRootView>
+    );
+  }
+
+  const handleLogout = async () => {
+    await authLogout();
+    setAuthenticated(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    await authDeleteAccount();
+    setAuthenticated(false);
+  };
+
+  const authContextValue = { logout: handleLogout, deleteAccount: handleDeleteAccount };
+
   return (
+    <AuthProvider value={authContextValue}>
     <NotificationProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView style={{ backgroundColor: "#0F1724", flex: 1 }}>
@@ -149,6 +197,7 @@ export default function RootLayout() {
         </SafeAreaView>
       </GestureHandlerRootView>
     </NotificationProvider>
+    </AuthProvider>
   );
 }
 

@@ -294,6 +294,76 @@ GET /api/v1/power?mac=AA:BB:CC:DD:EE:FF&time_range=1h&bucket=1m
 
 ---
 
+### Check Poll Count
+```
+POST /api/v1/checkPoll/{mac}
+```
+
+**Returns the number of poll records for a given device (by MAC address).**
+
+**Example:**
+```
+POST /api/v1/checkPoll/AA:BB:CC:DD:EE:FF
+```
+
+**Response:**
+```json
+{
+  "count": 1523
+}
+```
+
+**Use Case:** Check if a device has historical data before displaying charts or deleting
+
+---
+
+### Insert Poll Data
+```
+POST /api/v1/polls
+Content-Type: application/json
+```
+
+**Insert a new poll record from external data sources. Automatically resolves machine_name from monitor_mac.**
+
+**Request:**
+```json
+{
+  "monitor_mac": "AA:BB:CC:DD:EE:FF",
+  "power_usage": 1500,
+  "poll_time": "2026-02-10T10:30:00Z"  // Optional, defaults to current time
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "status": "created",
+  "poll": {
+    "monitor_mac": "AA:BB:CC:DD:EE:FF",
+    "power_usage": 1500,
+    "poll_time": "2026-02-10T10:30:00Z"
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "detail": {
+    "status": "monitor_not_found",
+    "reason": "Monitor AA:BB:CC:DD:EE:FF not found. Register the device first."
+  }
+}
+```
+
+**⚠️ Important:**
+- Monitor must exist in database before inserting polls
+- Monitor must be assigned to a machine
+- If `poll_time` is omitted, uses current UTC time
+- Used by external monitoring scripts/services
+
+---
+
 ## 🔔 Push Notifications
 
 ### Register Notification Token
@@ -349,6 +419,239 @@ DELETE /api/v1/notifications/tokens/{token}
 ```
 DELETE /api/v1/notifications/tokens/ExponentPushToken[xxxxxxxxxxxxx]
 ```
+
+---
+
+## 🔐 Authentication
+
+All auth endpoints use **Argon2id** for password hashing and **JWT (HS256)** for access tokens.
+Refresh tokens are stored server-side and can be revoked via logout.
+Password reset uses **itsdangerous** time-safe tokens (valid for 1 hour).
+
+### Register
+```
+POST /api/v1/auth/register
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{
+  "username": "alice",
+  "email": "alice@example.com",
+  "password": "s3curepa$$"
+}
+```
+
+**Response (200):**
+```json
+{
+  "status": "created",
+  "user": { "id": 1, "username": "alice", "email": "alice@example.com" }
+}
+```
+
+**Error (400):**
+```json
+{ "detail": { "status": "weak_password" } }
+```
+```json
+{ "detail": { "status": "duplicate", "reason": "..." } }
+```
+
+**Notes:**
+- Password must be at least 8 characters
+- Username and email must be unique
+
+---
+
+### Login
+```
+POST /api/v1/auth/login
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "username": "alice", "password": "s3curepa$$" }
+```
+
+**Response (200):**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "abc123...",
+  "token_type": "bearer"
+}
+```
+
+**Error (401):**
+```json
+{ "detail": { "status": "invalid_credentials" } }
+```
+
+**Notes:**
+- Access token expires after 15 minutes (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
+- Refresh token expires after 7 days (configurable via `REFRESH_TOKEN_EXPIRE_DAYS`)
+
+---
+
+### Refresh Access Token
+```
+POST /api/v1/auth/refresh
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "refresh_token": "abc123..." }
+```
+
+**Response (200):**
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "abc123...",
+  "token_type": "bearer"
+}
+```
+
+**Error (401):**
+```json
+{ "detail": { "status": "invalid_refresh" } }
+```
+
+---
+
+### Logout
+```
+POST /api/v1/auth/logout
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "refresh_token": "abc123..." }
+```
+
+**Response (200):**
+```json
+{ "status": "logged_out" }
+```
+
+**Notes:**
+- Deletes the refresh token server-side so it cannot be reused
+
+---
+
+### Delete Account
+```
+DELETE /api/v1/auth/account
+Authorization: Bearer <access_token>
+```
+
+**Request:**
+No body required
+
+**Response (200):**
+```json
+{ "status": "deleted" }
+```
+
+**Error Responses:**
+
+*Unauthorized (401):*
+```json
+{ "detail": "Not authenticated" }
+```
+
+*Server Error (500):*
+```json
+{ "detail": { "status": "delete_failed" } }
+```
+
+**Notes:**
+- Requires authentication via Bearer token
+- Permanently deletes the user account and all associated refresh tokens
+- This action cannot be undone
+- The user will need to register a new account to use the system again
+
+---
+
+### Forgot Password
+```
+POST /api/v1/auth/forgot-password
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "email": "alice@example.com" }
+```
+
+**Response (200):**
+```json
+{ "status": "ok", "reset_code": "..." }
+```
+
+**Notes:**
+- Always returns `{ "status": "ok" }` even if the email doesn't exist (prevents user enumeration)
+- Reset code is generated using `itsdangerous.URLSafeTimedSerializer` and is valid for 1 hour
+- In production, the reset code should be emailed instead of returned in the response
+
+---
+
+### Reset Password
+```
+POST /api/v1/auth/reset-password
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{ "reset_code": "...", "new_password": "newPa$$w0rd" }
+```
+
+**Response (200):**
+```json
+{ "status": "ok" }
+```
+
+**Error (400):**
+```json
+{ "detail": { "status": "invalid_or_expired_code" } }
+```
+```json
+{ "detail": { "status": "weak_password" } }
+```
+
+**Notes:**
+- Reset codes are single-use; consumed on successful reset
+- New password must be at least 8 characters
+
+---
+
+### Get Current User
+```
+GET /api/v1/auth/me
+Authorization: Bearer <access_token>
+```
+
+**Response (200):**
+```json
+{ "id": 1, "username": "alice", "email": "alice@example.com" }
+```
+
+**Error (401):**
+```json
+{ "detail": "Token expired" }
+```
+```json
+{ "detail": "Invalid authentication token" }
+```
+
+**Notes:**
+- Requires a valid JWT access token in the `Authorization: Bearer` header
 
 ---
 
@@ -503,6 +806,56 @@ Content-Type: application/json
 
 ---
 
+### Update Monitor
+```
+PUT /api/v1/monitors/{monitor_id}
+Content-Type: application/json
+```
+
+**Update a monitor's ID and/or MAC address. All associated poll records will be updated automatically.**
+
+**Request (update MAC only):**
+```json
+{
+  "mac": "DD:EE:FF:00:11:22"
+}
+```
+
+**Request (update ID only):**
+```json
+{
+  "id": 126
+}
+```
+
+**Request (update both):**
+```json
+{
+  "id": 126,
+  "mac": "DD:EE:FF:00:11:22"
+}
+```
+
+**Response (200):**
+```json
+{
+  "status": "Monitor updated successfully",
+  "monitor": {
+    "id": 126,
+    "mac": "DD:EE:FF:00:11:22",
+    "machine_name": "Pump 5"
+  }
+}
+```
+
+**⚠️ Important:**
+- At least one field (id or mac) must be provided
+- New MAC and ID must not already exist in the database
+- **All poll records** referencing the old MAC will be automatically updated to the new MAC
+- This ensures historical power data stays with the correct monitor
+
+---
+
 ### Reassign Monitor
 ```
 POST /api/v1/monitors/{monitor_id}/reassign?machine_name={machine_name}
@@ -536,6 +889,36 @@ POST /api/v1/monitors/{monitor_id}/unassign
   "monitor_id": 123
 }
 ```
+
+---
+
+### Delete Monitor
+```
+DELETE /api/v1/monitors/{monitor_id}
+```
+
+**Permanently delete a monitor from the database.**
+
+**Response (200):**
+```json
+{
+  "status": "Monitor 123 deleted successfully",
+  "monitor_id": 123
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "detail": "Cannot delete monitor with associated poll data. Use unassign endpoint instead to preserve historical data."
+}
+```
+
+**⚠️ Important:**
+- Monitors with associated poll data cannot be deleted
+- Use the unassign endpoint instead to preserve historical data
+- Only delete monitors that have never recorded any data
+- Consider unassigning instead of deleting in most cases
 
 ---
 
@@ -662,12 +1045,34 @@ await POST('/api/v1/muted-machines', {
 
 ## 📝 Quick Reference
 
+**Authentication:**
+- Register: `POST /api/v1/auth/register`
+- Login: `POST /api/v1/auth/login`
+- Refresh: `POST /api/v1/auth/refresh`
+- Logout: `POST /api/v1/auth/logout`
+- Forgot password: `POST /api/v1/auth/forgot-password`
+- Reset password: `POST /api/v1/auth/reset-password`
+- Current user: `GET /api/v1/auth/me` (requires `Authorization: Bearer <token>`)
+- Delete account: `DELETE /api/v1/auth/account` (requires `Authorization: Bearer <token>`)
+
 **Base CRUD:**
 - List: `GET /api/v1/devices`
 - Get One: `GET /api/v1/devices/{mac}` or `GET /api/v1/machines/{name}`
 - Create: `POST /api/v1/devices`
 - Update: `PUT /api/v1/devices/{mac}`
 - Delete: `DELETE /api/v1/devices/{mac}` or `DELETE /api/v1/machines/{name}`
+
+**Monitor Operations:**
+- List: `GET /api/v1/monitors`
+- Create: `POST /api/v1/monitors`
+- Update: `PUT /api/v1/monitors/{monitor_id}` (updates MAC/ID and all associated polls)
+- Reassign: `POST /api/v1/monitors/{monitor_id}/reassign?machine_name={name}`
+- Unassign: `POST /api/v1/monitors/{monitor_id}/unassign`
+- Delete: `DELETE /api/v1/monitors/{monitor_id}` (only if no poll data exists)
+
+**Poll Data:**
+- Get History: `GET /api/v1/power?mac={mac}&time_range={range}&bucket={bucket}`
+- Insert: `POST /api/v1/polls` (for external data sources)
 
 **Always URL encode:**
 - Machine names with spaces

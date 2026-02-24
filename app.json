@@ -14,7 +14,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.prozomix.powermon",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserNotificationsUsageDescription": "Powermon sends alerts when monitored devices go offline, when power output drops to zero or below configured thresholds, and when factory-wide power failures are detected. Enabling notifications ensures you are immediately informed of critical power events."
       }
     },
     "android": {
@@ -63,7 +64,7 @@
       "eas": {
         "projectId": "5a5b70c9-12c1-4609-aed3-d0249d7c2b6f"
       },
-      "apiBase": "http://192.168.11.175:8000"
+      "apiBase": ""
     }
   }
 }
