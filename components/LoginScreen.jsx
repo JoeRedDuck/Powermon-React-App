@@ -57,6 +57,11 @@ export default function LoginScreen({ onLoginSuccess }) {
 
   const handleLogin = async () => {
     setError("");
+    const currentApiUrl = await getApiUrl();
+    if (!currentApiUrl) {
+      setError("No server URL configured. Tap 'Server Settings' below to set one.");
+      return;
+    }
     if (!username.trim() || !password.trim()) {
       setError("Please enter username and password.");
       return;
@@ -75,6 +80,11 @@ export default function LoginScreen({ onLoginSuccess }) {
 
   const handleRegister = async () => {
     setError("");
+    const currentApiUrl = await getApiUrl();
+    if (!currentApiUrl) {
+      setError("No server URL configured. Tap 'Server Settings' below to set one.");
+      return;
+    }
     if (!username.trim() || !email.trim() || !password.trim()) {
       setError("Please fill in all fields.");
       return;

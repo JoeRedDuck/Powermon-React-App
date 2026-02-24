@@ -152,7 +152,7 @@ async function registerForPushNotificationsAsync() {
     });
   }
 
-  if (!Device.isDevice) return; // Handle simulator vs real device
+  if (!Device.isDevice) return;
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -164,9 +164,15 @@ async function registerForPushNotificationsAsync() {
   
   if (finalStatus !== 'granted') return;
 
-  // Get the token
-  const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  
-  return token;
+  try {
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    if (!projectId) {
+      console.error('No EAS project ID found — cannot get push token');
+      return;
+    }
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    return token;
+  } catch (error) {
+    console.error('Failed to get push token:', error);
+  }
 }

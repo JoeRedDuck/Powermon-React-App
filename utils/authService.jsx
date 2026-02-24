@@ -168,6 +168,40 @@ export async function logout() {
 }
 
 /**
+ * Authenticated fetch wrapper — automatically refreshes the access token on 401.
+ * Returns null (and clears auth) if the session cannot be recovered.
+ * Pass onSessionExpired callback to handle forced logout in the UI.
+ */
+export async function fetchWithAuth(url, options = {}, onSessionExpired = null) {
+  let accessToken = await getAccessToken();
+
+  const doFetch = (token) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+  let res = await doFetch(accessToken);
+
+  if (res.status === 401) {
+    // Try refresh
+    const newToken = await refreshAccessToken();
+    if (!newToken) {
+      // Session is dead — force re-login
+      if (onSessionExpired) onSessionExpired();
+      return null;
+    }
+    res = await doFetch(newToken);
+  }
+
+  return res;
+}
+
+/**
  * Delete the current user's account permanently
  */
 export async function deleteAccount() {

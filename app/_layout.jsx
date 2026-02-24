@@ -202,7 +202,6 @@ export default function RootLayout() {
 }
 
 function Topbar({ filterOpen, setFilterOpen }) {
-  const filterOptions = {}
   const { mac, id } = useGlobalSearchParams();
   const pathname = usePathname()
 

@@ -1,6 +1,4 @@
-import * as Notifications from "expo-notifications";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-
 
 // import { ScrollView } from "react-native-web";
 import NotificationCard from "../components/NotificationCard";
@@ -35,21 +33,6 @@ export default function NotificationsScreen () {
         )}
       </View>
   )
-}
-
-async function sendTestNotification() {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Low Power Alert",
-      body: "Pump 3 is low power",
-      data: { 
-        from: "test",
-        createdAt: new Date().toISOString()
-      },
-    },
-    trigger: { seconds: 1 },
-    
-  });
 }
 
 const styles = StyleSheet.create({

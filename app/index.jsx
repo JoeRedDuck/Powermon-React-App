@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import 'react-native-gesture-handler';
 import MetricCard from "../components/MetricCard";
 import { getApiUrl } from "../utils/apiConfig";
 
@@ -84,11 +83,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: "600",
-    color: "#111827"
+    color: "#F9FAFB"
   },
   emptyText: {
     fontSize: 16,
-    color: "#6B7280"
+    color: "#9CA3AF"
   }
 })
 
