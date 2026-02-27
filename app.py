@@ -518,9 +518,10 @@ def register(user: UserCreate, session: Session = Depends(get_db)):
     try:
         created = db.create_user(session, user.username, user.email, pwd)
         return {"status": "created", "user": created}
-    except Exception as e:
-        # IntegrityError likely: duplicate username/email
-        raise HTTPException(status_code=400, detail={"status": "duplicate", "reason": str(e)})
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail={"status": "duplicate", "reason": str(e)})
+    except Exception:
+        raise HTTPException(status_code=409, detail={"status": "duplicate", "reason": "An account with this email or username already exists"})
 
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse)

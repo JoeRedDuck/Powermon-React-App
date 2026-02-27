@@ -411,7 +411,17 @@ def reassign_monitor(db: Session, monitor_id: int, new_machine_name: str) -> boo
 
 
 def create_user(db: Session, username: str, email: str, password_hash: str) -> Dict[str, Any]:
-    """Create a new user and return the user dict."""
+    """Create a new user and return the user dict.
+
+    Raises ValueError with a human-readable message when the username or
+    email is already taken.
+    """
+    # Pre-check for duplicates so we can give a friendly message
+    if db.query(models.User).filter(models.User.email == email).first():
+        raise ValueError("An account with this email already exists")
+    if db.query(models.User).filter(models.User.username == username.lower()).first():
+        raise ValueError("This username is already taken")
+
     user = models.User(username=username.lower(), email=email, password_hash=password_hash)
     db.add(user)
     try:
@@ -420,7 +430,7 @@ def create_user(db: Session, username: str, email: str, password_hash: str) -> D
         return {"id": user.id, "username": user.username, "email": user.email}
     except IntegrityError:
         db.rollback()
-        raise
+        raise ValueError("An account with this email or username already exists")
 
 
 def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
