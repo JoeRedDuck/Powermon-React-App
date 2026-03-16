@@ -287,13 +287,15 @@ def send_expo_notification(title: str, body: str, priority: str = "default", mac
             token = token_info["token"]
             device_id = token_info["device_name"]
 
-            # Skip if this device has muted any of the machines in this notification
-            if machine_names and device_id:
+            if machine_names:
+                # Tokens without device_name cannot have mute preferences checked —
+                # skip them for alert notifications to prevent bypassing mutes
+                if not device_id:
+                    print(f"Skipping unidentified token (no device_name) — re-register device to receive alerts")
+                    continue
                 muted_machines = mute_prefs.get(device_id, [])
-                # If any machine in the notification is muted by this device, skip
                 if any(machine in muted_machines for machine in machine_names):
-                    print(
-                        f"Skipping notification to device {device_id} (has muted machines)")
+                    print(f"Skipping notification to device {device_id} (has muted machines)")
                     continue
 
             message = {
@@ -328,6 +330,8 @@ def send_expo_notification(title: str, body: str, priority: str = "default", mac
 
 async def alert_monitor(poll_sec=10, cooldown=300):
     alerted_devices = []
+    online_streak = {}  # consecutive "online" check count per device name
+    first_run = True
     while True:
         if UPS_OUTAGE.is_set():
             await asyncio.sleep(poll_sec)
@@ -345,11 +349,28 @@ async def alert_monitor(poll_sec=10, cooldown=300):
                     elif d["status"] == "no power":
                         none.append(d)
 
-                # Deduplication logic
-                online_now = {d["name"]
-                              for d in devices if d["status"] == "online"}
-                alerted_devices = [
-                    d for d in alerted_devices if d["name"] not in online_now]
+                # On first run after startup, pre-populate alerted_devices from
+                # current state so a restart doesn't re-alert already-alerting devices
+                if first_run:
+                    alerted_devices = list(off + low + none)
+                    first_run = False
+                    await asyncio.sleep(poll_sec)
+                    continue
+
+                # Track consecutive online checks per device.
+                # Only clear a device from alerted_devices after it has been
+                # online for 3 consecutive checks (~30 s) — this prevents
+                # brief power spikes on flapping devices (e.g. Minus 80)
+                # from resetting deduplication and triggering repeat alerts.
+                for d in devices:
+                    name = d["name"]
+                    if d["status"] == "online":
+                        online_streak[name] = online_streak.get(name, 0) + 1
+                    else:
+                        online_streak[name] = 0
+
+                sustained_online = {name for name, streak in online_streak.items() if streak >= 3}
+                alerted_devices = [d for d in alerted_devices if d["name"] not in sustained_online]
                 alerted_names = {a["name"] for a in alerted_devices}
 
                 new_off = [d for d in off if d["name"] not in alerted_names]
