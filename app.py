@@ -262,7 +262,7 @@ def get_device_status(device, low_threshold=50, stale_minutes=1):
     return "no power" if last_power == 0 else ("low power" if last_power < low_threshold else "online")
 
 
-def send_expo_notification(title: str, body: str, priority: str = "default", machine_names: Optional[List[str]] = None, mac: Optional[str] = None):
+def send_expo_notification(title: str, body: str, priority: str = "default", machine_names: Optional[List[str]] = None, mac: Optional[str] = None, notification_type: Optional[str] = None, notification_mac: Optional[str] = None):
     """
     Send push notification to all registered Expo tokens.
     Priority: 'default', 'high' (for critical alerts)
@@ -307,7 +307,9 @@ def send_expo_notification(title: str, body: str, priority: str = "default", mac
                 "data": {
                     "createdAt": timestamp,
                     "machines": machine_names if machine_names else [],
-                    "mac": mac
+                    "mac": mac,
+                    "type": notification_type,
+                    "notification_mac": notification_mac
                 }
             }
 
@@ -979,6 +981,22 @@ def create_poll(poll: PollCreate, session: Session = Depends(get_db)):
             status_code=500,
             detail={"status": "database_error", "reason": str(e)}
         )
+
+
+@app.post("/api/v1/monitors/notify-discovered")
+def notify_monitor_discovered(body: dict, session: Session = Depends(get_db)):
+    """Called by powermon4 when it sees a MAC that isn't in the database."""
+    mac = body.get("mac", "")
+    if not mac:
+        raise HTTPException(status_code=400, detail="mac required")
+    send_expo_notification(
+        "New Monitor Detected",
+        f"A new monitor ({mac}) is on the network. Tap to add it.",
+        priority="default",
+        notification_type="new_monitor",
+        notification_mac=mac
+    )
+    return {"status": "notification sent"}
 
 
 @app.post("/api/v1/notifications/register")
