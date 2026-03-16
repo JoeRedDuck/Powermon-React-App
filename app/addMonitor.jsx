@@ -13,7 +13,7 @@ export default function AddMonitor() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [isEdit, setIsEdit] = useState(false);
-  const { id: idParam } = useLocalSearchParams();
+  const { id: idParam, mac: macParam } = useLocalSearchParams();
   const [apiBase, setApiBase] = useState('')
   
   useEffect(() => {
@@ -85,6 +85,12 @@ export default function AddMonitor() {
     if (isEdit) return;
     clearForm();
   }, [isEdit]);
+
+  useEffect(() => {
+    if (macParam && !idParam) {
+      setMac(String(macParam));
+    }
+  }, [macParam, idParam]);
 
   const submitButtonText = isEdit ? "Save Changes" : "Add Monitor";
 

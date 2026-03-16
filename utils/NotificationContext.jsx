@@ -117,7 +117,9 @@ export function NotificationProvider({ children }) {
         createdAt: new Date().toISOString(),
       });
       const data = payload.data || {};
-      if (data?.mac) {
+      if (data?.type === "new_monitor" && data?.notification_mac) {
+        router.push({ pathname: "/addMonitor", params: { mac: data.notification_mac } });
+      } else if (data?.mac) {
         router.push({ pathname: "/device", params: { mac: data.mac } });
       } else {
         router.push("/notifications");
@@ -151,7 +153,9 @@ export function NotificationProvider({ children }) {
         createdAt: new Date().toISOString(),
       });
       const data = payload.data || {};
-      if (data?.mac) {
+      if (data?.type === "new_monitor" && data?.notification_mac) {
+        router.push({ pathname: "/addMonitor", params: { mac: data.notification_mac } });
+      } else if (data?.mac) {
         router.push({ pathname: "/device", params: { mac: data.mac } });
       } else {
         router.push("/notifications");
