@@ -18,6 +18,15 @@ def main():
         sys.exit(1)
 
     print("Recreating schema...")
+    # Terminate all other connections to this database so DROP TABLE doesn't block
+    with engine.connect() as conn:
+        conn.execute(text("""
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND pid <> pg_backend_pid()
+        """))
+        conn.commit()
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
 

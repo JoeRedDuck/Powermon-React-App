@@ -262,7 +262,7 @@ def get_device_status(device, low_threshold=50, stale_minutes=1):
     return "no power" if last_power == 0 else ("low power" if last_power < low_threshold else "online")
 
 
-def send_expo_notification(title: str, body: str, priority: str = "default", machine_names: Optional[List[str]] = None):
+def send_expo_notification(title: str, body: str, priority: str = "default", machine_names: Optional[List[str]] = None, mac: Optional[str] = None):
     """
     Send push notification to all registered Expo tokens.
     Priority: 'default', 'high' (for critical alerts)
@@ -306,7 +306,8 @@ def send_expo_notification(title: str, body: str, priority: str = "default", mac
                 "sound": "default",
                 "data": {
                     "createdAt": timestamp,
-                    "machines": machine_names if machine_names else []
+                    "machines": machine_names if machine_names else [],
+                    "mac": mac
                 }
             }
 
@@ -378,6 +379,7 @@ async def alert_monitor(poll_sec=10, cooldown=300):
                 new_none = [d for d in none if d["name"] not in alerted_names]
 
                 # Collect all affected machine names
+                all_new = new_none + new_low + new_off
                 affected_machines = []
 
                 if new_none:
@@ -396,9 +398,11 @@ async def alert_monitor(poll_sec=10, cooldown=300):
                 if messages:
                     title = "Machine Alert"
                     body = "\n".join(messages)
-                    # Pass machine names to enable mute preferences filtering
+                    # For single-device alerts include the MAC so the app can deep-link
+                    # to the device page; for multi-device alerts the app goes to the list
+                    affected_mac = all_new[0]["mac"] if len(all_new) == 1 else None
                     send_expo_notification(
-                        title, body, priority="high", machine_names=affected_machines)
+                        title, body, priority="high", machine_names=affected_machines, mac=affected_mac)
                     alerted_devices.extend(new_off + new_low + new_none)
                     await asyncio.sleep(cooldown)
                 else:
