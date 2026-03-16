@@ -104,6 +104,26 @@ export function NotificationProvider({ children }) {
 
   // Centralised permission + listeners
   useEffect(() => {
+    // Handle cold-start: app was fully closed, user tapped notification to open it
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const payload = response.notification.request.content;
+      const compositeId = `${response.notification.request.identifier}_coldstart_${Date.now()}`;
+      addNotification({
+        id: compositeId,
+        title: payload.title || "",
+        body: payload.body || "",
+        data: payload.data || {},
+        createdAt: new Date().toISOString(),
+      });
+      const data = payload.data || {};
+      if (data?.mac) {
+        router.push({ pathname: "/device", params: { mac: data.mac } });
+      } else {
+        router.push("/notifications");
+      }
+    });
+
     const receiveSub = Notifications.addNotificationReceivedListener((notification) => {
       const payload = notification.request.content;
       // Use a composite ID to guarantee uniqueness across platforms and app restarts
@@ -120,8 +140,17 @@ export function NotificationProvider({ children }) {
     });
 
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data || {};
-      // Example deep-link: if push includes { mac: '...' } it opens device
+      const payload = response.notification.request.content;
+      const compositeId = `${response.notification.request.identifier}_tap_${Date.now()}`;
+      // Store the notification in history when user taps it (covers background/closed state)
+      addNotification({
+        id: compositeId,
+        title: payload.title || "",
+        body: payload.body || "",
+        data: payload.data || {},
+        createdAt: new Date().toISOString(),
+      });
+      const data = payload.data || {};
       if (data?.mac) {
         router.push({ pathname: "/device", params: { mac: data.mac } });
       } else {
