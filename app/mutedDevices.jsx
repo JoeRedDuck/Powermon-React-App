@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import Constants from "expo-constants";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { getApiUrl } from "../utils/apiConfig";
 import { getMutedMachines, muteMachine, unmuteMachine } from "../utils/muteService.jsx";
 
 function DeviceToggleItem({ device, isMuted, onToggle, busy }) {
@@ -50,7 +50,7 @@ export default function MutedDevices() {
     setLoading(true);
     try {
       // Fetch all devices
-      const apiBase = process.env.EXPO_PUBLIC_API_BASE || Constants.expoConfig?.extra?.apiBase || '';
+      const apiBase = await getApiUrl();
       const url = `${apiBase.replace(/\/$/, '')}/api/v1/status`;
       const response = await fetch(url);
       
