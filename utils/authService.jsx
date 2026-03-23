@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiUrl } from './apiConfig';
+import { isTestMode, setTestMode, clearTestMode } from './testMode';
 
 const ACCESS_TOKEN_KEY = '@powermon_access_token';
 const REFRESH_TOKEN_KEY = '@powermon_refresh_token';
@@ -52,23 +53,16 @@ export async function clearAuth() {
 }
 
 /**
- * Check if user is logged in by validating the refresh token.
- * Attempts a token refresh on startup — clears auth and returns false if the
- * session is expired or revoked on the server.
+ * Check if user is logged in.
+ * Only checks if a refresh token exists locally — does NOT hit the network.
+ * This ensures network outages never force an unwanted logout.
+ * Token validity is checked lazily when API calls are made via fetchWithAuth.
  */
 export async function isLoggedIn() {
+  if (await isTestMode()) return true;
+
   const refreshToken = await getRefreshToken();
-  if (!refreshToken) return false;
-
-  // Validate the refresh token is still accepted by the server
-  const newToken = await refreshAccessToken();
-  if (!newToken) {
-    // Token is expired/revoked — clear stale auth data
-    await clearAuth();
-    return false;
-  }
-
-  return true;
+  return !!refreshToken;
 }
 
 /**
@@ -101,9 +95,16 @@ export async function register(username, email, password) {
 }
 
 /**
- * Login and store tokens
+ * Login and store tokens.
+ * Username "tester" activates offline testing mode with mock data.
  */
 export async function login(username, password) {
+  if (username.toLowerCase() === 'tester') {
+    await setTestMode();
+    await storeTokens('test_access_token', 'test_refresh_token');
+    return { access_token: 'test_access_token', refresh_token: 'test_refresh_token', token_type: 'bearer' };
+  }
+
   const apiBase = await getApiUrl();
   const url = `${apiBase}/api/v1/auth/login`;
 
@@ -130,6 +131,9 @@ export async function login(username, password) {
 /**
  * Refresh the access token using the refresh token.
  * Returns the new access token or null if refresh fails.
+ * Only clears auth (forces logout) when the server explicitly rejects the token
+ * (401/403). Network errors and server errors are treated as temporary — the
+ * user stays logged in so the app can retry when connectivity returns.
  */
 export async function refreshAccessToken() {
   const refreshToken = await getRefreshToken();
@@ -146,8 +150,11 @@ export async function refreshAccessToken() {
     });
 
     if (!res.ok) {
-      // Refresh token is invalid/expired — force re-login
-      await clearAuth();
+      // Only clear auth if the server explicitly rejected the token
+      // 500s, timeouts, etc. are temporary — keep the session alive
+      if (res.status === 401 || res.status === 403) {
+        await clearAuth();
+      }
       return null;
     }
 
@@ -155,6 +162,7 @@ export async function refreshAccessToken() {
     await storeTokens(data.access_token, data.refresh_token);
     return data.access_token;
   } catch {
+    // Network error — server unreachable, keep tokens, don't log out
     return null;
   }
 }
@@ -164,6 +172,11 @@ export async function refreshAccessToken() {
  */
 export async function logout() {
   try {
+    if (await isTestMode()) {
+      await clearTestMode();
+      await clearAuth();
+      return;
+    }
     const refreshToken = await getRefreshToken();
     if (refreshToken) {
       const apiBase = await getApiUrl();
@@ -203,8 +216,11 @@ export async function fetchWithAuth(url, options = {}, onSessionExpired = null) 
     // Try refresh
     const newToken = await refreshAccessToken();
     if (!newToken) {
-      // Session is dead — force re-login
-      if (onSessionExpired) onSessionExpired();
+      // Only trigger session expired if tokens were actually cleared by the
+      // server rejecting them. If it's just a network error, the tokens are
+      // still stored and the user stays logged in.
+      const stillHasToken = await getRefreshToken();
+      if (!stillHasToken && onSessionExpired) onSessionExpired();
       return null;
     }
     res = await doFetch(newToken);
