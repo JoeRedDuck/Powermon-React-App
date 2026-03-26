@@ -1,11 +1,43 @@
 import { router } from "expo-router";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import RightIcon from "../assets/icons/chevron-right.svg";
 import { useAuth } from "../utils/AuthContext";
+import { getApiUrl } from "../utils/apiConfig";
+import { getDeviceId } from "../utils/deviceId";
 
 
 export default function Menu () {
   const { logout, deleteAccount } = useAuth();
+  const [muteCritical, setMuteCritical] = useState(false);
+  const [muteWarning, setMuteWarning] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const deviceName = await getDeviceId();
+        const apiBase = await getApiUrl();
+        const res = await fetch(`${apiBase}/api/v1/notifications/preferences?device_name=${encodeURIComponent(deviceName)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMuteCritical(data.mute_critical);
+          setMuteWarning(data.mute_warning);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  async function togglePreference(field, value) {
+    try {
+      const deviceName = await getDeviceId();
+      const apiBase = await getApiUrl();
+      await fetch(`${apiBase}/api/v1/notifications/preferences`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_name: deviceName, [field]: value }),
+      });
+    } catch {}
+  }
 
   const handleLogout = () => {
     Alert.alert(
@@ -84,6 +116,45 @@ export default function Menu () {
             <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
           </View>
         </TouchableOpacity>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Notification Levels</Text>
+        </View>
+        <View style={styles.toggleContainer}>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleLabel}>
+              <View style={[styles.severityDot, { backgroundColor: "#DC2626" }]} />
+              <Text style={styles.optionText}>Critical Alerts</Text>
+            </View>
+            <Switch
+              value={!muteCritical}
+              onValueChange={(val) => {
+                setMuteCritical(!val);
+                togglePreference("mute_critical", !val);
+              }}
+              trackColor={{ false: "#D1D5DB", true: "#BFDBFE" }}
+              thumbColor={!muteCritical ? "#2563EB" : "#9CA3AF"}
+            />
+          </View>
+          <Text style={styles.toggleHint}>UPS power loss, multiple devices down</Text>
+          <View style={styles.toggleDivider} />
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleLabel}>
+              <View style={[styles.severityDot, { backgroundColor: "#F59E0B" }]} />
+              <Text style={styles.optionText}>Warning Alerts</Text>
+            </View>
+            <Switch
+              value={!muteWarning}
+              onValueChange={(val) => {
+                setMuteWarning(!val);
+                togglePreference("mute_warning", !val);
+              }}
+              trackColor={{ false: "#D1D5DB", true: "#BFDBFE" }}
+              thumbColor={!muteWarning ? "#2563EB" : "#9CA3AF"}
+            />
+          </View>
+          <Text style={styles.toggleHint}>Single device offline or low power</Text>
+        </View>
       </View>
       
       <View style={styles.logoutWrapper}>
@@ -177,5 +248,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#991B1B",
     fontWeight: "600",
-  }
+  },
+  sectionHeader: {
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#9CA3AF",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  toggleContainer: {
+    borderColor: "#E5E7EB",
+    borderWidth: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 5,
+    padding: 14,
+    marginVertical: 5,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  toggleLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  severityDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  toggleHint: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginLeft: 20,
+    marginTop: 2,
+  },
+  toggleDivider: {
+    height: 1,
+    backgroundColor: "#F3F4F6",
+    marginVertical: 12,
+  },
 })
