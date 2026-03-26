@@ -3,14 +3,14 @@
     "name": "Prozomix Powermon",
     "slug": "Powermon",
     "owner": "joeredduck",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "powermon",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "buildNumber": "3",
+      "buildNumber": "8",
       "supportsTablet": true,
       "bundleIdentifier": "com.prozomix.powermon",
       "infoPlist": {
@@ -34,6 +34,15 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/critical.wav",
+            "./assets/sounds/warning.wav"
+          ]
+        }
+      ],
       [
         "expo-build-properties",
         {
