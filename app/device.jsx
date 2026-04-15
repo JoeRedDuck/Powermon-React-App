@@ -243,7 +243,8 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     flex: 1,
     paddingVertical: 15,
-    paddingHorizontal: 10
+    paddingHorizontal: 10,
+    marginTop: 10,
   },
   name: {
     fontWeight: "600",

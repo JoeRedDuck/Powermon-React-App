@@ -14,6 +14,7 @@ export default function Status() {
   const [selectedMachineType, setSelectedMachineType] = useState(null)
   const [selectedStatus, setSelectedStatus] = useState(null)
   const [hasError, setHasError] = useState(false)
+  const [loading, setLoading] = useState(true)
   const TYPE_ORDER = ['IPM'];
   const LOCATION_ORDER = ['Production line'];
 
@@ -48,6 +49,7 @@ export default function Status() {
           .then(data => {
             if (!mounted) return;
             setHasError(false);
+            setLoading(false);
             if (Array.isArray(data)) setDevices(data);
             else if (data && Array.isArray(data.devices)) setDevices(data.devices);
             else setDevices([]);
@@ -56,6 +58,7 @@ export default function Status() {
             if (!mounted) return;
             console.error('status fetch failed', err);
             setHasError(true);
+            setLoading(false);
             setDevices([]);
           });
       };
@@ -91,7 +94,7 @@ export default function Status() {
       }}
       style={{flex: 1, backgroundColor: "#F9FAFB"}}
     >
-      {hasError ? (
+      {loading ? null : hasError ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No Connection</Text>
           <Text style={styles.emptyText}>Unable to reach the server</Text>

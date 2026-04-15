@@ -206,15 +206,14 @@ export default function AddDevice () {
       // Navigate back to manage devices after successful edit
       if (isEdit) {
         router.back();
+        return; // skip state updates — component is unmounting
       }
-      
-      setMachineType("");
+
+      clearForm();
     } catch (err) {
       setError(`${String(err).slice(0, 300)}`);
     } finally {
-      clearForm()
       setBusy(false);
-      
     }
   }
 

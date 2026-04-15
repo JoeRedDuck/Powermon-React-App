@@ -7,6 +7,7 @@ export default function Index() {
   const [deviceStats, setDeviceStats] = useState({})
   const [apiBase, setApiBase] = useState('')
   const [hasError, setHasError] = useState(false)
+  const [loading, setLoading] = useState(true)
   
   useEffect(() => {
     getApiUrl().then(setApiBase).catch(err => {
@@ -31,11 +32,13 @@ export default function Index() {
         })
         .then(data => {
           setHasError(false);
+          setLoading(false);
           setDeviceStats(data);
         })
         .catch(err => {
           console.error('stats fetch failed', err);
           setHasError(true);
+          setLoading(false);
           setDeviceStats({});
         });
     }
@@ -49,17 +52,17 @@ export default function Index() {
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
-      {hasError ? (
+      {loading ? null : hasError ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No Connection</Text>
           <Text style={styles.emptyText}>Unable to reach the server</Text>
         </View>
       ) : (
         <>
-          <MetricCard type="low power" value={deviceStats["low power"]}></MetricCard>
-          <MetricCard type="no power" value={deviceStats["no power"]}></MetricCard>
-          <MetricCard type="online" value={deviceStats["online"]}></MetricCard>
-          <MetricCard type="offline" value={deviceStats["offline"]}></MetricCard>
+          <MetricCard type="low power" value={deviceStats["low power"]} />
+          <MetricCard type="no power" value={deviceStats["no power"]} />
+          <MetricCard type="online" value={deviceStats["online"]} />
+          <MetricCard type="offline" value={deviceStats["offline"]} />
         </>
       )}
     </ScrollView>

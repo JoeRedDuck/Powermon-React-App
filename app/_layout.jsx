@@ -19,6 +19,7 @@ import { AuthProvider } from "../utils/AuthContext";
 import { deleteAccount as authDeleteAccount, logout as authLogout, isLoggedIn } from "../utils/authService";
 import useGetDevice from "../utils/getDevice.jsx";
 import { NotificationProvider } from "../utils/NotificationContext";
+import { isTestMode as checkTestMode, mockFetch, resetMockDevices } from "../utils/testMode";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -32,6 +33,7 @@ Notifications.setNotificationHandler({
 export default function RootLayout() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [testMode, setTestModeState] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [machineTypes, setMachineTypes] = useState([])
   const [locations, setLocations] = useState([])
@@ -46,11 +48,26 @@ export default function RootLayout() {
 
   // Check auth on mount
   useEffect(() => {
-    isLoggedIn().then(loggedIn => {
+    Promise.all([isLoggedIn(), checkTestMode()]).then(([loggedIn, isTesting]) => {
       setAuthenticated(loggedIn);
+      setTestModeState(isTesting);
       setAuthChecked(true);
     });
   }, []);
+
+  // Override global fetch when test mode is active
+  useEffect(() => {
+    if (testMode) {
+      if (!global._originalFetch) global._originalFetch = global.fetch;
+      global.fetch = (url, opts) => mockFetch(url, opts);
+    }
+    return () => {
+      if (global._originalFetch) {
+        global.fetch = global._originalFetch;
+        delete global._originalFetch;
+      }
+    };
+  }, [testMode]);
 
   useEffect(() => {
     if (pathname !== "/status" && pathname !== "/manageDevices" && filterOpen) setFilterOpen(false)
@@ -114,7 +131,13 @@ export default function RootLayout() {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView style={{ backgroundColor: "#0F1724", flex: 1 }}>
-          <LoginScreen onLoginSuccess={() => setAuthenticated(true)} />
+          <LoginScreen onLoginSuccess={() => {
+            checkTestMode().then(isTesting => {
+              setTestModeState(isTesting);
+              if (isTesting) resetMockDevices();
+            });
+            setAuthenticated(true);
+          }} />
         </SafeAreaView>
       </GestureHandlerRootView>
     );
@@ -122,6 +145,7 @@ export default function RootLayout() {
 
   const handleLogout = async () => {
     await authLogout();
+    setTestModeState(false);
     setAuthenticated(false);
   };
 

@@ -1,23 +1,21 @@
-import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { getApiUrl } from "../utils/apiConfig";
 
 export default function ManageDeviceCard({ device, onDelete }) {
   const [busy, setBusy] = useState(false)
 
   async function checkPolls(mac) {
-     const base =
-    (process.env.EXPO_PUBLIC_API_BASE ??
-      Constants.expoConfig?.extra?.apiBase ??
-      '').replace(/\/$/, '');
+    const apiBase = await getApiUrl();
+    const base = apiBase.replace(/\/$/, '');
     try {
       const res = await fetch(`${base}/api/v1/checkPoll/${mac}`, { method: 'POST' });
       if (!res.ok) return null;
       const data = await res.json();
       return typeof data.count === 'number' ? data.count : null;
     } catch {
-      return null; 
+      return null;
     }
   }
 
@@ -31,7 +29,7 @@ export default function ManageDeviceCard({ device, onDelete }) {
       if (count !== null && count > 0) {
         const ok = Platform.OS === "web"
         ? window.confirm(
-          `This device has existing polls (${count}). .Are you sure you want to delete it?`)
+          `This device has existing polls (${count}). Are you sure you want to delete it?`)
         : await new Promise(resolve =>
           Alert.alert(
             "Confirm Delete",
@@ -45,35 +43,32 @@ export default function ManageDeviceCard({ device, onDelete }) {
         if (!ok) return;
       }
 
-    const apiBase =
-      process.env.EXPO_PUBLIC_API_BASE ||
-      Constants.expoConfig?.extra?.apiBase ||
-      '';
-    
-    // Smart delete: use /machines endpoint for devices without monitors (mac === null)
-    let url;
-    if (mac === null || mac === '') {
-      // Machine without monitor - use machine name
-      url = `${apiBase.replace(/\/$/, '')}/api/v1/machines/${encodeURIComponent(device.name)}`;
-    } else {
-      // Device with monitor - use MAC address
-      url = `${apiBase.replace(/\/$/, '')}/api/v1/devices/${encodeURIComponent(mac)}`;
-    }
-    
-    const response = await fetch(url, { method: "DELETE" });
+      const apiBase = await getApiUrl();
+      const base = apiBase.replace(/\/$/, '');
 
-    if (!response.ok) {
-      Alert.alert("Delete failed")
-      console.log(response)
-      return
-    }
-    const data = await response.json();
-    console.log(data);
-    if (data.status === "deleted") {
-      onDelete?.(mac);
+      // Smart delete: use /machines endpoint for devices without monitors (mac === null)
+      let url;
+      if (mac === null || mac === '') {
+        url = `${base}/api/v1/machines/${encodeURIComponent(device.name)}`;
+      } else {
+        url = `${base}/api/v1/devices/${encodeURIComponent(mac)}`;
       }
+
+      const response = await fetch(url, { method: "DELETE" });
+
+      if (!response.ok) {
+        Alert.alert("Delete failed")
+        console.log(response)
+        return
+      }
+      const data = await response.json();
+      console.log(data);
+      if (data.status === "deleted") {
+        onDelete?.(mac);
+      }
+    } finally {
+      setBusy(false);
     }
-    finally {setBusy(false);}
   }
 
 

@@ -17,7 +17,7 @@ export async function getApiUrl() {
   }
   
   // Fallback to environment or config
-  const defaultUrl = process.env.EXPO_PUBLIC_API_BASE || Constants.expoConfig?.extra?.apiBase || '';
+  const defaultUrl = process.env.EXPO_PUBLIC_API_BASE || Constants.expoConfig?.extra?.apiBase || 'http://tapomon:8000';
   return defaultUrl.replace(/\/$/, '');
 }
 
@@ -39,7 +39,7 @@ export async function setApiUrl(url) {
  * Get the default API URL from environment/config
  */
 export function getDefaultApiUrl() {
-  const defaultUrl = process.env.EXPO_PUBLIC_API_BASE || Constants.expoConfig?.extra?.apiBase || '';
+  const defaultUrl = process.env.EXPO_PUBLIC_API_BASE || Constants.expoConfig?.extra?.apiBase || 'http://tapomon:8000';
   return defaultUrl.replace(/\/$/, '');
 }
 

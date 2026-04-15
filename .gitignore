@@ -42,4 +42,6 @@ app-example
 /ios
 /android
 *.apk
+*.aab
 build-*.apk
+build-*.aab

@@ -5,7 +5,7 @@ import NotificationCard from "../components/NotificationCard";
 import { useNotifications } from "../utils/NotificationContext";
 
 export default function NotificationsScreen () {
-  const { notifications, clearAllNotifications } = useNotifications();
+  const { notifications, clearAllNotifications, clearNotification } = useNotifications();
 
   return (
       <View style={styles.container}>
@@ -18,7 +18,7 @@ export default function NotificationsScreen () {
           <>
             <ScrollView contentContainerStyle={styles.scroll}>
               {notifications.map((notif) => (
-                <NotificationCard key={notif.id} notification={notif} />
+                <NotificationCard key={notif.id} notification={notif} onDismiss={clearNotification} />
               ))}
             </ScrollView>
             <View style={styles.clearSection}>

@@ -1,16 +1,10 @@
-import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { getApiUrl } from "../utils/apiConfig";
 
 export default function ManageMonitorCard({monitor, onDelete}) {
   const [busy, setBusy] = useState(false);
-
-  const apiBase =
-    process.env.EXPO_PUBLIC_API_BASE ||
-    Constants.expoConfig?.extra?.apiBase ||
-    '';
-  const base = `${apiBase.replace(/\/$/, '')}/api/v1`;
 
   // Handle edit - navigate to addMonitor in edit mode
   function handleEdit() {
@@ -43,11 +37,13 @@ export default function ManageMonitorCard({monitor, onDelete}) {
     }
   }
 
-  // Delete monitor using the device deletion endpoint
+  // Delete monitor
   async function deleteMonitor() {
     setBusy(true);
     try {
-      const res = await fetch(`${base}/devices/${encodeURIComponent(monitor.mac)}`, {
+      const apiBase = await getApiUrl();
+      const base = `${apiBase.replace(/\/$/, '')}/api/v1`;
+      const res = await fetch(`${base}/monitors/${encodeURIComponent(monitor.id)}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" }
       });
