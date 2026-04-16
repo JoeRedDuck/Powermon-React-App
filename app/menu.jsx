@@ -94,16 +94,35 @@ export default function Menu () {
       <View style={styles.page_container}>
         <TouchableOpacity onPress={() => router.push({pathname: "/addMonitor"})}>
           <View style={styles.settings_container}>
-            <Text style={styles.optionText}>Add New Monitor</Text>
+            <Text style={styles.optionText}>Add Power Monitor</Text>
             <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push({pathname: "/manageMonitors"})}>
           <View style={styles.settings_container}>
-            <Text style={styles.optionText}>Manage Monitors</Text>
+            <Text style={styles.optionText}>Manage Power Monitors</Text>
             <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
           </View>
         </TouchableOpacity>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Vacuum Monitors</Text>
+        </View>
+        <TouchableOpacity onPress={() => router.push({pathname: "/addVacMonitor"})}>
+          <View style={styles.settings_container}>
+            <Text style={styles.optionText}>Add Vacuum Monitor</Text>
+            <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push({pathname: "/manageVacMonitors"})}>
+          <View style={styles.settings_container}>
+            <Text style={styles.optionText}>Manage Vacuum Monitors</Text>
+            <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>General</Text>
+        </View>
         <TouchableOpacity onPress={() => router.push({pathname: "/apiSettings"})}>
           <View style={styles.settings_container}>
             <Text style={styles.optionText}>API Settings</Text>

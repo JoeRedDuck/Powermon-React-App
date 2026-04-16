@@ -1,0 +1,173 @@
+import { router } from "expo-router";
+import { useState } from "react";
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { getApiUrl } from "../utils/apiConfig";
+
+export default function ManageVacMonitorCard({monitor, onDelete}) {
+  const [busy, setBusy] = useState(false);
+
+  function handleEdit() {
+    if (busy) return;
+    router.push({ pathname: "/addVacMonitor", params: { id: monitor.id } });
+  }
+
+  async function handleRemove() {
+    if (busy) return;
+
+    const message = monitor.name || monitor.system_name
+      ? `This will permanently delete Vacuum Monitor ${monitor.id} (${monitor.mac}) and remove it from ${monitor.name || monitor.system_name}.`
+      : `This will permanently delete Vacuum Monitor ${monitor.id} (${monitor.mac}).`;
+
+    if (Platform.OS === 'web') {
+      const confirmed = confirm(
+        `Delete Vacuum Monitor ${monitor.id}?\n\n${message}`
+      );
+      if (confirmed) await deleteMonitor();
+    } else {
+      Alert.alert(
+        "Delete Vacuum Monitor",
+        message,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Delete", onPress: () => deleteMonitor(), style: "destructive" }
+        ]
+      );
+    }
+  }
+
+  async function deleteMonitor() {
+    setBusy(true);
+    try {
+      const apiBase = await getApiUrl();
+      const base = `${apiBase.replace(/\/$/, '')}/api/v1`;
+      const res = await fetch(`${base}/vacuum/monitors/${encodeURIComponent(monitor.id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!res.ok) {
+        let errorMsg;
+        try {
+          const body = await res.json();
+          errorMsg = body?.detail?.reason || body?.detail || body?.message || body?.error;
+        } catch {
+          errorMsg = await res.text();
+        }
+        throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      }
+
+      Alert.alert("Success", `Vacuum Monitor ${monitor.id} has been deleted`);
+      if (onDelete) onDelete(monitor.id);
+
+    } catch (err) {
+      Alert.alert("Error", `Failed to delete monitor: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+     <View style={styles.container}>
+      <View style={styles.card}>
+
+        <View>
+          <Text style={styles.label}>Monitor ID</Text>
+          <Text style={styles.attribute}>{monitor.id}</Text>
+        </View>
+
+        <View style={styles.line}></View>
+
+        <View>
+          <Text style={styles.label}>Mac Address</Text>
+          <Text style={styles.attribute}>{monitor.mac}</Text>
+        </View>
+
+        <View style={styles.line}></View>
+
+        <View>
+          <Text style={styles.label}>Assigned System</Text>
+          <Text style={styles.attribute}>{monitor.name || monitor.system_name || "Unassigned"}</Text>
+        </View>
+
+        <View style={styles.line}></View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity onPress={handleEdit} disabled={busy}>
+            <Text style={[styles.edit, busy && styles.disabledText]}>Edit</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.removeButton, busy && styles.disabledButton]}
+            onPress={handleRemove}
+            disabled={busy}>
+            <Text style={styles.removeText}>{busy ? "Processing..." : "Remove"}</Text>
+          </TouchableOpacity>
+        </View>
+
+      </View>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 10,
+    alignItems: "center"
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E6E9EC",
+    borderWidth: 1,
+    borderRadius: 10,
+    width: "100%",
+    flexDirection: "column",
+    paddingVertical: 10,
+    justifyContent: "space-around"
+  },
+  label: {
+    color: "#6B7280",
+    fontSize: 13,
+    paddingHorizontal: 16
+  },
+  attribute: {
+    fontSize: 19,
+    paddingHorizontal: 16
+  },
+  line: {
+    height: 0,
+    borderColor: "#E6E9EC",
+    borderWidth: 0.5
+  },
+  edit: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2563EA",
+    paddingHorizontal: 30,
+    marginTop: 10
+  },
+  disabledText: {
+    color: "#9CA3AF",
+    opacity: 0.5
+  },
+  removeButton: {
+    backgroundColor: "#EF4444",
+    borderRadius: 7,
+    height: 40,
+    width: 80,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 3
+  },
+  disabledButton: {
+    backgroundColor: "#F87171",
+    opacity: 0.5
+  },
+  removeText: {
+    fontSize: 15,
+    color: "#FFFFFF",
+    fontWeight: "bold"
+  },
+  buttonContainer: {
+    flexDirection: "row"
+  }
+});

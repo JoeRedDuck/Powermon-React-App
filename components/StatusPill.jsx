@@ -21,6 +21,10 @@ export default function StatusPill(status) {
     statusPillStyle["backgroundColor"] = "#EF4444"
     deviceStatus = "Monitor Offline"
     statusPillStyle["width"] = 135
+  } else if (status["status"] == "high pressure") {
+    statusPillStyle["backgroundColor"] = "#EF4444"
+    deviceStatus = "High Pressure"
+    statusPillStyle["width"] = 135
   }
 
   return(

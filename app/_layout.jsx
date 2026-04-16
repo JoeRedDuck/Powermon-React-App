@@ -18,6 +18,7 @@ import { getApiUrl } from "../utils/apiConfig";
 import { AuthProvider } from "../utils/AuthContext";
 import { deleteAccount as authDeleteAccount, logout as authLogout, isLoggedIn } from "../utils/authService";
 import useGetDevice from "../utils/getDevice.jsx";
+import useGetVacDevice from "../utils/getVacDevice.jsx";
 import { NotificationProvider } from "../utils/NotificationContext";
 import { isTestMode as checkTestMode, mockFetch, resetMockDevices } from "../utils/testMode";
 
@@ -232,20 +233,27 @@ function Topbar({ filterOpen, setFilterOpen }) {
   // Only fetch device by MAC for /device route, not for /addDevice (which uses machine name)
   const device = useGetDevice(pathname === "/device" ? mac : null);
   const deviceName = pathname === "/device" ? (device?.name || null) : null;
+  const vacDevice = useGetVacDevice(pathname === "/vacDevice" ? mac : null);
+  const vacDeviceName = pathname === "/vacDevice" ? (vacDevice?.name || null) : null;
   const titles = {
     "/": "Dashboard",
     "/status": "Devices",
     "/manageDevices": "Manage Devices",
     "/addDevice": (typeof mac === "string" && mac.length) ? "Edit Device" : "Add Device",
-    "/manageMonitors": "Manage Monitors",
-    "/addMonitor": (typeof id === "string" && id.length) ? "Edit Monitor" : "Add Monitor",
+    "/manageMonitors": "Manage Power Monitors",
+    "/addMonitor": (typeof id === "string" && id.length) ? "Edit Power Monitor" : "Add Power Monitor",
     "/menu": "Settings",
-    "/notifications": "Notifications"
+    "/notifications": "Notifications",
+    "/vacStatus": "Vacuum Systems",
+    "/manageVacMonitors": "Manage Vacuum Monitors",
+    "/addVacMonitor": (typeof id === "string" && id.length) ? "Edit Vacuum Monitor" : "Add Vacuum Monitor",
   }
 
   let title
   if (pathname === "/device" && deviceName) {
     title = deviceName;
+  } else if (pathname === "/vacDevice" && vacDeviceName) {
+    title = vacDeviceName;
   } else {
   title = titles[pathname] || "App";
   }
