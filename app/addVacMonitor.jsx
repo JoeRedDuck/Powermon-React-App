@@ -14,7 +14,13 @@ export default function AddVacMonitor() {
   const [error, setError] = useState(null);
   const [isEdit, setIsEdit] = useState(false);
   const { id: idParam, mac: macParam } = useLocalSearchParams();
-  const [apiBase, setApiBase] = useState('')
+  const [apiBase, setApiBase] = useState('');
+
+  // New system form
+  const [showNewSystem, setShowNewSystem] = useState(false);
+  const [newSystemName, setNewSystemName] = useState('');
+  const [newSystemLocation, setNewSystemLocation] = useState('');
+  const [creatingSystem, setCreatingSystem] = useState(false);
 
   useEffect(() => {
     getApiUrl().then(setApiBase).catch(err => {
@@ -46,26 +52,23 @@ export default function AddVacMonitor() {
     }
   };
 
-  // Fetch available vacuum systems
-  useEffect(() => {
+  function fetchSystems() {
     if (!base) return;
-
-    const url = `${base}/vacuum/systems`;
-    fetch(url)
+    fetch(`${base}/vacuum/systems`)
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) {
-          const sorted = data.sort((a, b) => {
-            const nameA = a.name || '';
-            const nameB = b.name || '';
-            return nameA.localeCompare(nameB);
-          });
+          const sorted = data.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           setSystems(sorted);
         } else {
           setSystems([]);
         }
       })
       .catch(() => setSystems([]));
+  }
+
+  useEffect(() => {
+    fetchSystems();
   }, [base]);
 
   useEffect(() => {
@@ -92,6 +95,47 @@ export default function AddVacMonitor() {
       setMac(String(macParam));
     }
   }, [macParam, idParam]);
+
+  async function handleCreateSystem() {
+    if (creatingSystem) return;
+    if (!newSystemName.trim()) {
+      Alert.alert("Error", "Please enter a system name");
+      return;
+    }
+    setCreatingSystem(true);
+    try {
+      const res = await fetch(`${base}/vacuum/systems`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newSystemName.trim(),
+          location: newSystemLocation.trim() || null
+        })
+      });
+      if (!res.ok) {
+        let msg;
+        try {
+          const body = await res.json();
+          msg = body?.detail || body?.message || body?.error;
+        } catch {
+          msg = await res.text();
+        }
+        Alert.alert("Error", typeof msg === 'string' ? msg : JSON.stringify(msg));
+        return;
+      }
+      const createdName = newSystemName.trim();
+      setNewSystemName('');
+      setNewSystemLocation('');
+      setShowNewSystem(false);
+      fetchSystems();
+      setSelectedSystem(createdName);
+      Alert.alert("Success", `System "${createdName}" created`);
+    } catch (err) {
+      Alert.alert("Error", err.message);
+    } finally {
+      setCreatingSystem(false);
+    }
+  }
 
   const submitButtonText = isEdit ? "Save Changes" : "Add Vacuum Monitor";
 
@@ -152,7 +196,6 @@ export default function AddVacMonitor() {
         return;
       }
 
-      // For adding new vacuum monitor
       if (!monitorId || !mac) {
         Alert.alert("Error", "Please fill in Monitor ID and MAC Address");
         setBusy(false);
@@ -225,7 +268,7 @@ export default function AddVacMonitor() {
       </View>
 
       <View>
-        <Text style={styles.label}>Assign to Vacuum System (Optional):</Text>
+        <Text style={styles.label}>Assign to Vacuum System:</Text>
         <PlatformPicker
           items={[{ label: 'No System (Leave Unassigned)', value: '' }, ...systems.map(s => ({ label: s.name, value: s.name }))]}
           selectedValue={selectedSystem}
@@ -233,6 +276,41 @@ export default function AddVacMonitor() {
           style={styles.pickerWrapper}
           selectorStyle={styles.selector}
         />
+
+        <TouchableOpacity
+          style={styles.newSystemToggle}
+          onPress={() => setShowNewSystem(!showNewSystem)}>
+          <Text style={styles.newSystemToggleText}>
+            {showNewSystem ? "Cancel" : "+ Create New System"}
+          </Text>
+        </TouchableOpacity>
+
+        {showNewSystem && (
+          <View style={styles.newSystemForm}>
+            <TextInput
+              style={styles.input}
+              placeholder="System name (e.g. Freeze Dryer 1)"
+              placeholderTextColor="#9CA3AF"
+              value={newSystemName}
+              onChangeText={setNewSystemName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Location (optional)"
+              placeholderTextColor="#9CA3AF"
+              value={newSystemLocation}
+              onChangeText={setNewSystemLocation}
+            />
+            <TouchableOpacity
+              style={styles.createSystemButton}
+              onPress={handleCreateSystem}
+              disabled={creatingSystem}>
+              <Text style={styles.createSystemText}>
+                {creatingSystem ? "Creating..." : "Create System"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <View>
@@ -323,5 +401,34 @@ const styles = StyleSheet.create({
   },
   selector: {
     color: "#111827"
-  }
+  },
+  newSystemToggle: {
+    marginTop: 8,
+  },
+  newSystemToggleText: {
+    fontSize: 15,
+    color: "#2563EA",
+    fontWeight: "600",
+  },
+  newSystemForm: {
+    marginTop: 8,
+    backgroundColor: "#F9FAFB",
+    borderColor: "#E5E7EB",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+  },
+  createSystemButton: {
+    backgroundColor: "#16A34A",
+    height: 40,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  createSystemText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 15,
+  },
 });

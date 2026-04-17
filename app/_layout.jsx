@@ -1,7 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { router, Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackIcon from "../assets/icons/arrow-left.svg";
@@ -227,8 +227,10 @@ export default function RootLayout() {
 }
 
 function Topbar({ filterOpen, setFilterOpen }) {
-  const { mac, id } = useGlobalSearchParams();
+  const { mac, id, name } = useGlobalSearchParams();
   const pathname = usePathname()
+  const [addDropdownOpen, setAddDropdownOpen] = useState(false);
+  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
 
   // Only fetch device by MAC for /device route, not for /addDevice (which uses machine name)
   const device = useGetDevice(pathname === "/device" ? mac : null);
@@ -245,8 +247,10 @@ function Topbar({ filterOpen, setFilterOpen }) {
     "/menu": "Settings",
     "/notifications": "Notifications",
     "/vacStatus": "Vacuum Systems",
+    "/manageVacSystems": "Manage Vacuum Systems",
     "/manageVacMonitors": "Manage Vacuum Monitors",
     "/addVacMonitor": (typeof id === "string" && id.length) ? "Edit Vacuum Monitor" : "Add Vacuum Monitor",
+    "/addVacSystem": (typeof name === "string" && name.length) ? "Edit Vacuum System" : "Add Vacuum System",
   }
 
   let title
@@ -257,6 +261,37 @@ function Topbar({ filterOpen, setFilterOpen }) {
   } else {
   title = titles[pathname] || "App";
   }
+
+  // Show dropdown on add screens (but not edit mode)
+  const isAddScreen = (pathname === "/addDevice" && !(typeof mac === "string" && mac.length))
+    || (pathname === "/addVacSystem" && !(typeof name === "string" && name.length));
+
+  // Show dropdown on view-switch screens (Devices ↔ Vacuum Systems, Manage Devices ↔ Manage Vacuum Systems)
+  const isViewSwitchScreen = ["/status", "/vacStatus", "/manageDevices", "/manageVacSystems"].includes(pathname);
+
+  // View switch dropdown options per screen pair
+  const viewSwitchOptions = {
+    "/status": [
+      { label: "Devices", route: "/status" },
+      { label: "Vacuum Systems", route: "/vacStatus" },
+    ],
+    "/vacStatus": [
+      { label: "Devices", route: "/status" },
+      { label: "Vacuum Systems", route: "/vacStatus" },
+    ],
+    "/manageDevices": [
+      { label: "Manage Devices", route: "/manageDevices" },
+      { label: "Manage Vacuum Systems", route: "/manageVacSystems" },
+    ],
+    "/manageVacSystems": [
+      { label: "Manage Devices", route: "/manageDevices" },
+      { label: "Manage Vacuum Systems", route: "/manageVacSystems" },
+    ],
+  };
+
+  const hasDropdown = isAddScreen || isViewSwitchScreen;
+  const dropdownOpen = isAddScreen ? addDropdownOpen : viewDropdownOpen;
+  const setDropdownOpen = isAddScreen ? setAddDropdownOpen : setViewDropdownOpen;
 
   const textStyle = {
     color: "#FFFFFF",
@@ -278,23 +313,74 @@ function Topbar({ filterOpen, setFilterOpen }) {
         height: 56,
         backgroundColor: "#0F1724",
         flexDirection: "row",
-        alignItems: "center"
+        alignItems: "center",
+        zIndex: 100,
 }}
-    >  
+    >
       {(title != "Dashboard") &&(
       <TouchableOpacity style = {topBarStyle} onPress={() => {router.back()}}>
         <BackIcon width = {32} height = {32} stroke="#FFFFFF"/>
       </TouchableOpacity>)}
 
-      <View style = {{...topBarStyle, flex: 1}}>
-      <Text style = {textStyle}>{title}</Text>
+      <View style = {{...topBarStyle, flex: 1, zIndex: 100}}>
+        {hasDropdown ? (
+          <TouchableOpacity
+            onPress={() => setDropdownOpen(!dropdownOpen)}
+            style={{ flexDirection: "row", alignItems: "center" }}
+          >
+            <Text style={textStyle}>{title}</Text>
+            <Text style={{ color: "#FFFFFF", fontSize: 14, marginLeft: 6, marginBottom: 2 }}>
+              {dropdownOpen ? "▲" : "▼"}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={textStyle}>{title}</Text>
+        )}
+        {dropdownOpen && isAddScreen && (
+          <View style={styles.addDropdown}>
+            <TouchableOpacity
+              style={styles.addDropdownItem}
+              onPress={() => { setAddDropdownOpen(false); router.replace("/addDevice"); }}
+            >
+              <Text style={[styles.addDropdownText, pathname === "/addDevice" && styles.addDropdownTextActive]}>
+                Add Device
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.addDropdownDivider} />
+            <TouchableOpacity
+              style={styles.addDropdownItem}
+              onPress={() => { setAddDropdownOpen(false); router.replace("/addVacSystem"); }}
+            >
+              <Text style={[styles.addDropdownText, pathname === "/addVacSystem" && styles.addDropdownTextActive]}>
+                Add Vacuum System
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {dropdownOpen && isViewSwitchScreen && (
+          <View style={styles.addDropdown}>
+            {viewSwitchOptions[pathname]?.map((opt, i) => (
+              <View key={opt.route}>
+                {i > 0 && <View style={styles.addDropdownDivider} />}
+                <TouchableOpacity
+                  style={styles.addDropdownItem}
+                  onPress={() => { setViewDropdownOpen(false); router.replace(opt.route); }}
+                >
+                  <Text style={[styles.addDropdownText, pathname === opt.route && styles.addDropdownTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
       {(title == "Devices" || title == "Manage Devices") &&(
       <TouchableOpacity style = {topBarStyle} onPress={() => {setFilterOpen(!filterOpen)}}>
         <FilterIcon width = {28} height = {28} stroke="#FFFFFF"/>
       </TouchableOpacity>)}
-    
+
       {(title == "Dashboard") && (
       <TouchableOpacity style = {topBarStyle} onPress={() => {router.push("/notifications")}}>
         <Bell width = {28} height = {28} stroke="#FFFFFF"/>
@@ -328,7 +414,7 @@ function Bottombar() {
   return (
     <View
       style={{
-        
+
         height: 64,
         width: "100%",
         backgroundColor: "#0F1724",
@@ -441,5 +527,37 @@ const styles = StyleSheet.create({
   },
   selector: {
     color: "#111827"
-  }
+  },
+  addDropdown: {
+    position: "absolute",
+    top: 40,
+    left: 0,
+    backgroundColor: "#1E293B",
+    borderRadius: 10,
+    paddingVertical: 4,
+    minWidth: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 100,
+  },
+  addDropdownItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  addDropdownText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  addDropdownTextActive: {
+    color: "#2563EA",
+    fontWeight: "bold",
+  },
+  addDropdownDivider: {
+    height: 1,
+    backgroundColor: "#334155",
+  },
 })

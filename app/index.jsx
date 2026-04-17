@@ -59,7 +59,8 @@ export default function Index() {
     };
     }, [base]);
 
-  const hasVacData = vacStats.online > 0 || vacStats.offline > 0 || vacStats.high_pressure > 0;
+  const vacLossCount = vacStats.vacuum_loss ?? vacStats.high_pressure ?? 0;
+  const hasVacData = vacStats.online > 0 || vacStats.offline > 0 || vacLossCount > 0;
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -80,9 +81,9 @@ export default function Index() {
             <>
               <Text style={[styles.sectionTitle, {marginTop: 16}]}>Vacuum Monitoring</Text>
               <MetricCard
-                type="high pressure"
-                value={vacStats.high_pressure || 0}
-                onPress={() => router.push({ pathname: "/vacStatus", params: {status: "high pressure"}})}
+                type="vacuum loss"
+                value={vacLossCount}
+                onPress={() => router.push({ pathname: "/vacStatus", params: {status: "vacuum loss"}})}
               />
               <MetricCard
                 type="vac_online"

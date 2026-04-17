@@ -119,6 +119,8 @@ export function NotificationProvider({ children }) {
       const data = payload.data || {};
       if (data?.type === "new_monitor" && data?.notification_mac) {
         router.push({ pathname: "/addMonitor", params: { mac: data.notification_mac } });
+      } else if (data?.type === "vac_monitor_discovered" && data?.notification_mac) {
+        router.push({ pathname: "/addVacMonitor", params: { mac: data.notification_mac } });
       } else if (data?.mac) {
         router.push({ pathname: "/device", params: { mac: data.mac } });
       } else {
@@ -155,6 +157,8 @@ export function NotificationProvider({ children }) {
       const data = payload.data || {};
       if (data?.type === "new_monitor" && data?.notification_mac) {
         router.push({ pathname: "/addMonitor", params: { mac: data.notification_mac } });
+      } else if (data?.type === "vac_monitor_discovered" && data?.notification_mac) {
+        router.push({ pathname: "/addVacMonitor", params: { mac: data.notification_mac } });
       } else if (data?.mac) {
         router.push({ pathname: "/device", params: { mac: data.mac } });
       } else {

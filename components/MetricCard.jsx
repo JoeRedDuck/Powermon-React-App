@@ -7,7 +7,7 @@ export default function MetricCard ( {type="offline", value = 0, onPress} ) {
     "low power": {accentColour: "#F59E0B", pillColour: "#D97706", title: "Low Power", pillText: "Low Power"},
     "offline": {accentColour: "#9CA3AF", pillColour: "#6B7280", title: "Offline Monitors", pillText: "Offline"},
     "online": {accentColour: "#22C55E", pillColour: "#16A34A", title: "Online", pillText: "Online"},
-    "high pressure": {accentColour: "#EF4444", pillColour: "#DC2626", title: "High Pressure", pillText: "Alert"},
+    "vacuum loss": {accentColour: "#EF4444", pillColour: "#DC2626", title: "Vacuum Loss", pillText: "Alert"},
     "vac_online": {accentColour: "#22C55E", pillColour: "#16A34A", title: "Online", pillText: "Online"},
     "vac_offline": {accentColour: "#9CA3AF", pillColour: "#6B7280", title: "Offline", pillText: "Offline"},
   }[type]

@@ -6,6 +6,7 @@ import { ScrollView } from "react-native-gesture-handler";
 import { VictoryAxis, VictoryChart, VictoryLine } from "victory-native";
 import GraphDropdown from "../components/graphDropdown.jsx";
 import StatusPill from "../components/StatusPill";
+import VacuumGauge from "../components/VacuumGauge";
 import { getApiUrl } from "../utils/apiConfig.jsx";
 import useGetVacDevice from "../utils/getVacDevice.jsx";
 
@@ -119,7 +120,11 @@ export default function VacDevice () {
             <Text style={styles.data}>{device?.location}</Text>
           </View>
         </View>
+        <View style={styles.gaugeCard}>
+          <VacuumGauge pressure={device?.status !== "offline" ? device?.last_pressure : null} />
+        </View>
         <View style={styles.graphCard}>
+          <Text style={styles.axisLabel}>Pressure (mbar)</Text>
           <GraphDropdown
             options={TIME_OPTIONS}
             selectedValue={timeRange}
@@ -134,17 +139,15 @@ export default function VacDevice () {
           <VictoryChart
             domain={chartDomain}
             style={{ parent: { width: "100%"} }}
-            padding={{ top: 10, bottom: 20, left: 60, right: 45 }}
+            padding={{ top: 10, bottom: 20, left: 45, right: 45 }}
             domainPadding={{ y: 20 }}
             scale={{ x: "time" }}
           >
             <VictoryAxis
               dependentAxis
               tickFormat={(tickValue) => {
-                if (tickValue >= 1) {
-                  return `${tickValue.toFixed(1)} mbar`
-                }
-                return `${tickValue.toFixed(3)} mbar`
+                if (tickValue >= 1) return tickValue.toFixed(1);
+                return tickValue.toFixed(3);
               }}
               style={{
                 tickLabels: { fontSize: 10, fill: "#4B5563" },
@@ -212,6 +215,16 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
   },
+  gaugeCard: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 11,
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    marginTop: 10,
+    alignItems: "center",
+  },
   graphCard: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
@@ -221,6 +234,13 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 10,
     marginTop: 10,
+  },
+  axisLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500",
+    marginBottom: 4,
+    marginLeft: 10,
   },
   name: {
     fontWeight: "600",

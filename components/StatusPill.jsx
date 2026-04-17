@@ -21,9 +21,9 @@ export default function StatusPill(status) {
     statusPillStyle["backgroundColor"] = "#EF4444"
     deviceStatus = "Monitor Offline"
     statusPillStyle["width"] = 135
-  } else if (status["status"] == "high pressure") {
+  } else if (status["status"] == "vacuum loss" || status["status"] == "high pressure") {
     statusPillStyle["backgroundColor"] = "#EF4444"
-    deviceStatus = "High Pressure"
+    deviceStatus = "Vacuum Loss"
     statusPillStyle["width"] = 135
   }
 
