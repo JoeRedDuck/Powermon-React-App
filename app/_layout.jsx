@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { router, Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import { useEffect, useState } from 'react';
@@ -26,7 +27,7 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
-    shouldPlaySound: false,
+    shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
@@ -146,12 +147,14 @@ export default function RootLayout() {
 
   const handleLogout = async () => {
     await authLogout();
+    await AsyncStorage.removeItem("powermon_notifications_v2");
     setTestModeState(false);
     setAuthenticated(false);
   };
 
   const handleDeleteAccount = async () => {
     await authDeleteAccount();
+    await AsyncStorage.removeItem("powermon_notifications_v2");
     setAuthenticated(false);
   };
 

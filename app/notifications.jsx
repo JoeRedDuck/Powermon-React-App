@@ -1,3 +1,5 @@
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // import { ScrollView } from "react-native-web";
@@ -5,7 +7,13 @@ import NotificationCard from "../components/NotificationCard";
 import { useNotifications } from "../utils/NotificationContext";
 
 export default function NotificationsScreen () {
-  const { notifications, clearAllNotifications, clearNotification } = useNotifications();
+  const { notifications, clearAllNotifications, clearNotification, refreshFromServer } = useNotifications();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshFromServer?.();
+    }, [refreshFromServer])
+  );
 
   return (
       <View style={styles.container}>

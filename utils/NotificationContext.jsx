@@ -1,182 +1,191 @@
-// app/NotificationContext.jsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { Platform } from "react-native";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { AppState, Platform } from "react-native";
 import { getApiUrl } from "./apiConfig";
-import { getDeviceId } from "./deviceId"; // Import to ensure consistent device ID
+import { fetchWithAuth, isLoggedIn } from "./authService";
+import { getDeviceId } from "./deviceId";
 
-const STORAGE_KEY = "powermon_notifications_v1";
+const STORAGE_KEY = "powermon_notifications_v2";
+const POLL_INTERVAL_MS = 5 * 60 * 1000;
+
 const NotificationContext = createContext(null);
 
 export function useNotifications() {
   return useContext(NotificationContext);
 }
 
+function routeForPayload(data) {
+  if (data?.type === "new_monitor" && data?.notification_mac) {
+    router.push({ pathname: "/addMonitor", params: { mac: data.notification_mac } });
+  } else if (data?.type === "vac_monitor_discovered" && data?.notification_mac) {
+    router.push({ pathname: "/addVacMonitor", params: { mac: data.notification_mac } });
+  } else if (data?.mac) {
+    router.push({ pathname: "/device", params: { mac: data.mac } });
+  } else {
+    router.push("/notifications");
+  }
+}
+
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
+  const pollTimerRef = useRef(null);
 
+  // Register push token with backend
   useEffect(() => {
     registerForPushNotificationsAsync().then(async token => {
-      if (token) {
-        console.log("EXPO PUSH TOKEN:", token);
-        
-        // Register token with your API
-        try {
-          const apiBase = await getApiUrl();
-          const base = `${apiBase}/api/v1`;
-          
-          // Use the same device ID as mute preferences to ensure consistency
-          const deviceName = await getDeviceId();
-          const url = `${base}/notifications/register`;
-          
-          console.log("Registering token at:", url);
-          console.log("Device name:", deviceName);
-          
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              token: token,
-              device_name: deviceName,
-            }),
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log("Token registered:", data.status);
-          } else {
-            const errorText = await response.text();
-            console.error("Failed to register token:", response.status);
-            console.error("Response:", errorText);
-          }
-        } catch (error) {
-          console.error("Error registering token:", error);
-        }
+      if (!token) return;
+      console.log("EXPO PUSH TOKEN:", token);
+      try {
+        const apiBase = await getApiUrl();
+        const deviceName = await getDeviceId();
+        const res = await fetch(`${apiBase}/api/v1/notifications/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, device_name: deviceName }),
+        });
+        if (!res.ok) console.error("Failed to register token:", res.status, await res.text());
+      } catch (error) {
+        console.error("Error registering token:", error);
       }
     });
-  }, [])
+  }, []);
 
-  // load from AsyncStorage on mount
+  // Hydrate from AsyncStorage immediately for snappy first paint
   useEffect(() => {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) setNotifications(JSON.parse(raw));
       } catch (e) {
-        console.warn("Failed to load notifications", e);
+        console.warn("Failed to load notifications cache", e);
       }
     })();
   }, []);
 
-  // persist on change
+  // Persist whenever notifications change
   useEffect(() => {
-    (async () => {
-      try {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-      } catch (e) {
-        console.warn("Failed to save notifications", e);
-      }
-    })();
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(notifications)).catch(e =>
+      console.warn("Failed to save notifications cache", e)
+    );
   }, [notifications]);
 
-  // Helpers
-  function addNotification(notification) {
-    setNotifications((prev) => {
-      if (!notification || !notification.id) return prev;
-      if (prev.some((n) => n.id === notification.id)) return prev;
-      return [notification, ...prev];
-    });
-  }
+  // Server fetch — source of truth
+  const refreshFromServer = useCallback(async () => {
+    if (!(await isLoggedIn())) return;
+    try {
+      const apiBase = await getApiUrl();
+      const res = await fetchWithAuth(`${apiBase}/api/v1/notifications/history`);
+      if (!res || !res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setNotifications(data);
+    } catch (e) {
+      console.warn("Notification history fetch failed", e);
+    }
+  }, []);
 
-  function clearAllNotifications() {
-    setNotifications([]);
-  }
-
-  function clearNotification(id) {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }
-
-  // Centralised permission + listeners
+  // Initial fetch + 5min polling + foreground refresh
   useEffect(() => {
-    // Handle cold-start: app was fully closed, user tapped notification to open it
-    Notifications.getLastNotificationResponseAsync().then((response) => {
+    refreshFromServer();
+    pollTimerRef.current = setInterval(refreshFromServer, POLL_INTERVAL_MS);
+
+    const sub = AppState.addEventListener("change", state => {
+      if (state === "active") refreshFromServer();
+    });
+
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      sub.remove();
+    };
+  }, [refreshFromServer]);
+
+  // OS listeners — optimistic add then reconcile with server
+  useEffect(() => {
+    Notifications.getLastNotificationResponseAsync().then(response => {
       if (!response) return;
-      const payload = response.notification.request.content;
-      const compositeId = `${response.notification.request.identifier}_coldstart_${Date.now()}`;
-      addNotification({
-        id: compositeId,
-        title: payload.title || "",
-        body: payload.body || "",
-        data: payload.data || {},
-        createdAt: new Date().toISOString(),
-      });
-      const data = payload.data || {};
-      if (data?.type === "new_monitor" && data?.notification_mac) {
-        router.push({ pathname: "/addMonitor", params: { mac: data.notification_mac } });
-      } else if (data?.type === "vac_monitor_discovered" && data?.notification_mac) {
-        router.push({ pathname: "/addVacMonitor", params: { mac: data.notification_mac } });
-      } else if (data?.mac) {
-        router.push({ pathname: "/device", params: { mac: data.mac } });
-      } else {
-        router.push("/notifications");
-      }
+      const data = response.notification.request.content.data || {};
+      routeForPayload(data);
+      refreshFromServer();
     });
 
-    const receiveSub = Notifications.addNotificationReceivedListener((notification) => {
-      const payload = notification.request.content;
-      // Use a composite ID to guarantee uniqueness across platforms and app restarts
-      // request.identifier is not guaranteed unique for remote pushes on Android
-      const compositeId = `${notification.request.identifier}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      const newNotification = {
-        id: compositeId,
-        title: payload.title || "",
-        body: payload.body || "",
-        data: payload.data || {},
-        createdAt: new Date().toISOString(),
-      };
-      addNotification(newNotification);
+    const receiveSub = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request.content.data || {};
+      const id = data?.notification_id;
+      if (id) {
+        setNotifications(prev => {
+          if (prev.some(n => n.id === id)) return prev;
+          return [{
+            id,
+            title: notification.request.content.title || "",
+            body: notification.request.content.body || "",
+            createdAt: data.createdAt || new Date().toISOString(),
+            data,
+          }, ...prev];
+        });
+      }
+      refreshFromServer();
     });
 
-    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const payload = response.notification.request.content;
-      const compositeId = `${response.notification.request.identifier}_tap_${Date.now()}`;
-      // Store the notification in history when user taps it (covers background/closed state)
-      addNotification({
-        id: compositeId,
-        title: payload.title || "",
-        body: payload.body || "",
-        data: payload.data || {},
-        createdAt: new Date().toISOString(),
-      });
-      const data = payload.data || {};
-      if (data?.type === "new_monitor" && data?.notification_mac) {
-        router.push({ pathname: "/addMonitor", params: { mac: data.notification_mac } });
-      } else if (data?.type === "vac_monitor_discovered" && data?.notification_mac) {
-        router.push({ pathname: "/addVacMonitor", params: { mac: data.notification_mac } });
-      } else if (data?.mac) {
-        router.push({ pathname: "/device", params: { mac: data.mac } });
-      } else {
-        router.push("/notifications");
-      }
+    const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data || {};
+      routeForPayload(data);
+      refreshFromServer();
     });
 
     return () => {
       receiveSub.remove();
       responseSub.remove();
     };
-  }, []);
+  }, [refreshFromServer]);
+
+  async function clearNotification(id) {
+    const previous = notifications;
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    try {
+      const apiBase = await getApiUrl();
+      const res = await fetchWithAuth(`${apiBase}/api/v1/notifications/${id}/dismiss`, {
+        method: "POST",
+      });
+      if (!res || !res.ok) {
+        setNotifications(previous);
+      }
+    } catch (e) {
+      console.error("Failed to dismiss notification", e);
+      setNotifications(previous);
+    }
+  }
+
+  async function clearAllNotifications() {
+    const previous = notifications;
+    setNotifications([]);
+    try {
+      const apiBase = await getApiUrl();
+      const res = await fetchWithAuth(`${apiBase}/api/v1/notifications/dismiss-all`, {
+        method: "POST",
+      });
+      if (!res || !res.ok) {
+        setNotifications(previous);
+      }
+    } catch (e) {
+      console.error("Failed to dismiss all notifications", e);
+      setNotifications(previous);
+    }
+  }
+
+  function clearLocalCache() {
+    setNotifications([]);
+    AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+  }
 
   const value = {
     notifications,
-    addNotification,
+    refreshFromServer,
     clearAllNotifications,
     clearNotification,
+    clearLocalCache,
   };
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
@@ -184,11 +193,26 @@ export function NotificationProvider({ children }) {
 
 async function registerForPushNotificationsAsync() {
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
+    await Notifications.setNotificationChannelAsync('critical', {
+      name: 'Critical Alerts',
       importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 500, 250, 500],
+      sound: 'critical.wav',
+      bypassDnd: true,
+      lightColor: '#DC2626',
+    });
+    await Notifications.setNotificationChannelAsync('warning', {
+      name: 'Warnings',
+      importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
+      sound: 'warning.wav',
+      lightColor: '#F59E0B',
+    });
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Info',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      sound: 'default',
+      lightColor: '#3B82F6',
     });
   }
 
@@ -196,12 +220,12 @@ async function registerForPushNotificationsAsync() {
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
-  
+
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-  
+
   if (finalStatus !== 'granted') return;
 
   try {

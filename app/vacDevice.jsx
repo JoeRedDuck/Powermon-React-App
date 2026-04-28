@@ -71,25 +71,31 @@ export default function VacDevice () {
     mac
   )}&time_range=${timeRange}&bucket=${bucket}`;
 
-  fetch(url)
-    .then((response) => response.json())
-    .then((data) => {
-      const backendPoints = data && Array.isArray(data.points) ? data.points : [];
+  const fetchPressure = () => {
+    fetch(url)
+      .then((response) => response.json())
+      .then((data) => {
+        const backendPoints = data && Array.isArray(data.points) ? data.points : [];
 
-      const mapped = backendPoints.map((backendPoint) => ({
-        value: Number(backendPoint.value),
-        date: new Date(backendPoint.date),
-      }));
-      mapped.sort((a, b) => a.date - b.date);
-      setGraphPoints(mapped);
-      setMin(typeof data?.min !== 'undefined' ? data.min : "-");
-      setMax(typeof data?.max !== 'undefined' ? data.max : "-");
-      setAverage(typeof data?.average !== 'undefined' ? data.average : "-");
-    })
-    .catch((error) => {
-      console.error("vacuum pressure fetch failed", error);
-      setGraphPoints([]);
-    });
+        const mapped = backendPoints.map((backendPoint) => ({
+          value: Number(backendPoint.value),
+          date: new Date(backendPoint.date),
+        }));
+        mapped.sort((a, b) => a.date - b.date);
+        setGraphPoints(mapped);
+        setMin(typeof data?.min !== 'undefined' ? data.min : "-");
+        setMax(typeof data?.max !== 'undefined' ? data.max : "-");
+        setAverage(typeof data?.average !== 'undefined' ? data.average : "-");
+      })
+      .catch((error) => {
+        console.error("vacuum pressure fetch failed", error);
+        setGraphPoints([]);
+      });
+  };
+
+  fetchPressure();
+  const id = setInterval(fetchPressure, 5000);
+  return () => clearInterval(id);
   }, [mac, timeRange, bucket, preferencesLoaded, apiBase]);
 
   const victoryPoints = graphPoints.map((p) => ({

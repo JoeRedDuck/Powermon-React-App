@@ -11,20 +11,37 @@ export default function useGetVacDevice (mac) {
       return;
     }
 
+    let cancelled = false;
+    let intervalId = null;
+
     getApiUrl().then(apiBase => {
+      if (cancelled) return;
       const base = `${apiBase}/api/v1`;
 
-      fetch(`${base}/vacuum/devices/${mac}`)
-        .then(res => res.json())
-        .then(data => {
-          const device = Array.isArray(data) ? data[0] : data;
-          setDevice(device || null);
-        })
-        .catch(() => setDevice(null));
+      const fetchDevice = () => {
+        fetch(`${base}/vacuum/devices/${mac}`)
+          .then(res => res.json())
+          .then(data => {
+            if (cancelled) return;
+            const device = Array.isArray(data) ? data[0] : data;
+            setDevice(device || null);
+          })
+          .catch(() => {
+            if (!cancelled) setDevice(null);
+          });
+      };
+
+      fetchDevice();
+      intervalId = setInterval(fetchDevice, 5000);
     }).catch(err => {
       console.error('Failed to load API URL:', err);
-      setDevice(null);
+      if (!cancelled) setDevice(null);
     });
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
     }, [mac]);
 
   return device
