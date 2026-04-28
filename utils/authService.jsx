@@ -134,36 +134,49 @@ export async function login(username, password) {
  * Only clears auth (forces logout) when the server explicitly rejects the token
  * (401/403). Network errors and server errors are treated as temporary — the
  * user stays logged in so the app can retry when connectivity returns.
+ *
+ * Single-flight: concurrent callers share one in-flight request so we don't
+ * race the server's refresh-token rotation (one wins, others would otherwise
+ * get 401 with the now-rotated token and force a logout).
  */
+let _refreshInFlight = null;
+
 export async function refreshAccessToken() {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) return null;
+  if (_refreshInFlight) return _refreshInFlight;
 
-  try {
-    const apiBase = await getApiUrl();
-    const url = `${apiBase}/api/v1/auth/refresh`;
+  _refreshInFlight = (async () => {
+    const refreshToken = await getRefreshToken();
+    if (!refreshToken) return null;
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
+    try {
+      const apiBase = await getApiUrl();
+      const url = `${apiBase}/api/v1/auth/refresh`;
 
-    if (!res.ok) {
-      // Only clear auth if the server explicitly rejected the token
-      // 500s, timeouts, etc. are temporary — keep the session alive
-      if (res.status === 401 || res.status === 403) {
-        await clearAuth();
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          await clearAuth();
+        }
+        return null;
       }
+
+      const data = await res.json();
+      await storeTokens(data.access_token, data.refresh_token);
+      return data.access_token;
+    } catch {
       return null;
     }
+  })();
 
-    const data = await res.json();
-    await storeTokens(data.access_token, data.refresh_token);
-    return data.access_token;
-  } catch {
-    // Network error — server unreachable, keep tokens, don't log out
-    return null;
+  try {
+    return await _refreshInFlight;
+  } finally {
+    _refreshInFlight = null;
   }
 }
 

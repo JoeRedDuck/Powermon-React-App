@@ -33,6 +33,7 @@ function routeForPayload(data) {
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const pollTimerRef = useRef(null);
+  const dismissedIdsRef = useRef(new Set());
 
   // Register push token with backend
   useEffect(() => {
@@ -73,7 +74,8 @@ export function NotificationProvider({ children }) {
     );
   }, [notifications]);
 
-  // Server fetch — source of truth
+  // Server fetch — source of truth, but always honor any locally pending dismissals
+  // so a slow dismiss POST + a concurrent refresh can't bring back a tapped-X notification.
   const refreshFromServer = useCallback(async () => {
     if (!(await isLoggedIn())) return;
     try {
@@ -81,7 +83,14 @@ export function NotificationProvider({ children }) {
       const res = await fetchWithAuth(`${apiBase}/api/v1/notifications/history`);
       if (!res || !res.ok) return;
       const data = await res.json();
-      if (Array.isArray(data)) setNotifications(data);
+      if (!Array.isArray(data)) return;
+      const filtered = data.filter(n => !dismissedIdsRef.current.has(n.id));
+      // Once the server confirms a dismissal (id no longer in response), stop tracking it locally.
+      const stillPresent = new Set(data.map(n => n.id));
+      for (const id of Array.from(dismissedIdsRef.current)) {
+        if (!stillPresent.has(id)) dismissedIdsRef.current.delete(id);
+      }
+      setNotifications(filtered);
     } catch (e) {
       console.warn("Notification history fetch failed", e);
     }
@@ -114,7 +123,7 @@ export function NotificationProvider({ children }) {
     const receiveSub = Notifications.addNotificationReceivedListener(notification => {
       const data = notification.request.content.data || {};
       const id = data?.notification_id;
-      if (id) {
+      if (id && !dismissedIdsRef.current.has(id)) {
         setNotifications(prev => {
           if (prev.some(n => n.id === id)) return prev;
           return [{
@@ -142,36 +151,28 @@ export function NotificationProvider({ children }) {
   }, [refreshFromServer]);
 
   async function clearNotification(id) {
-    const previous = notifications;
+    dismissedIdsRef.current.add(id);
     setNotifications(prev => prev.filter(n => n.id !== id));
     try {
       const apiBase = await getApiUrl();
-      const res = await fetchWithAuth(`${apiBase}/api/v1/notifications/${id}/dismiss`, {
+      await fetchWithAuth(`${apiBase}/api/v1/notifications/${id}/dismiss`, {
         method: "POST",
       });
-      if (!res || !res.ok) {
-        setNotifications(previous);
-      }
     } catch (e) {
-      console.error("Failed to dismiss notification", e);
-      setNotifications(previous);
+      console.warn("Dismiss POST failed (will retry next refresh)", e);
     }
   }
 
   async function clearAllNotifications() {
-    const previous = notifications;
+    notifications.forEach(n => dismissedIdsRef.current.add(n.id));
     setNotifications([]);
     try {
       const apiBase = await getApiUrl();
-      const res = await fetchWithAuth(`${apiBase}/api/v1/notifications/dismiss-all`, {
+      await fetchWithAuth(`${apiBase}/api/v1/notifications/dismiss-all`, {
         method: "POST",
       });
-      if (!res || !res.ok) {
-        setNotifications(previous);
-      }
     } catch (e) {
-      console.error("Failed to dismiss all notifications", e);
-      setNotifications(previous);
+      console.warn("Dismiss-all POST failed (will retry next refresh)", e);
     }
   }
 
