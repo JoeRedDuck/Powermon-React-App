@@ -47,7 +47,7 @@ function buildInitialVacSystems() {
   return [
     { name: "Freeze Dryer 1", location: "Lab A", monitor_count: 1 },
     { name: "Freeze Dryer 2", location: "Lab A", monitor_count: 1 },
-    { name: "Freeze Dryer 3", location: "Lab B", monitor_count: 0 },
+    { name: "Freeze Dryer 3", location: "Lab B", monitor_count: 1 },
   ];
 }
 
@@ -55,6 +55,7 @@ function buildInitialVacMonitors() {
   return [
     { id: 101, mac: "DD:EE:FF:00:01:01", system_name: "Freeze Dryer 1" },
     { id: 102, mac: "DD:EE:FF:00:01:02", system_name: "Freeze Dryer 2" },
+    { id: 103, mac: "DD:EE:FF:00:01:03", system_name: "Freeze Dryer 3" },
   ];
 }
 
@@ -67,7 +68,7 @@ function buildInitialVacDevices() {
       mac: "DD:EE:FF:00:01:01",
       id: 101,
       status: "online",
-      last_pressure: 0.794,    // static gauge value in the green zone
+      last_pressure: 0.794,    // green zone — good vacuum
       location: "Lab A",
       last_seen: now,
     },
@@ -75,9 +76,18 @@ function buildInitialVacDevices() {
       name: "Freeze Dryer 2",
       mac: "DD:EE:FF:00:01:02",
       id: 102,
+      status: "online",
+      last_pressure: 4.2,      // yellow zone — marginal
+      location: "Lab A",
+      last_seen: now,
+    },
+    {
+      name: "Freeze Dryer 3",
+      mac: "DD:EE:FF:00:01:03",
+      id: 103,
       status: "offline",
       last_pressure: null,
-      location: "Lab A",
+      location: "Lab B",
       last_seen: tenAgo,
     },
   ];
@@ -223,8 +233,13 @@ export function mockFetch(url, options = {}) {
     return Promise.resolve(jsonResponse(generatePowerPoints(mac, timeRange)));
   }
 
+  // Power-side rules below must skip /vacuum/* paths or they'll
+  // shadow the vacuum block (which used to silently return power devices
+  // for /vacuum/status, /vacuum/devices/{mac}, etc).
+  const isVacPath = path.includes('/vacuum/');
+
   // --- Monitors ---
-  if (path.endsWith('/monitors') && method === 'GET') {
+  if (!isVacPath && path.endsWith('/monitors') && method === 'GET') {
     const monitors = mockDevices.map(d => ({
       id: d.id,
       mac_address: d.mac,
@@ -234,12 +249,12 @@ export function mockFetch(url, options = {}) {
   }
 
   // --- Monitor reassign ---
-  if (path.match(/\/monitors\/\d+\/reassign/) && method === 'POST') {
+  if (!isVacPath && path.match(/\/monitors\/\d+\/reassign/) && method === 'POST') {
     return Promise.resolve(jsonResponse({ status: "ok" }));
   }
 
   // --- Monitor unassign ---
-  if (path.match(/\/monitors\/\d+\/unassign/) && method === 'POST') {
+  if (!isVacPath && path.match(/\/monitors\/\d+\/unassign/) && method === 'POST') {
     return Promise.resolve(jsonResponse({ status: "ok" }));
   }
 
@@ -251,14 +266,14 @@ export function mockFetch(url, options = {}) {
   }
 
   // --- Single device by MAC ---
-  if (path.match(/\/devices\//) && method === 'GET') {
+  if (!isVacPath && path.match(/\/devices\//) && method === 'GET') {
     const mac = decodeURIComponent(path.split('/devices/')[1]);
     const device = mockDevices.find(d => d.mac === mac);
     return Promise.resolve(device ? jsonResponse(device) : jsonResponse({ detail: "Not found" }, 404));
   }
 
   // --- Create device ---
-  if (path.endsWith('/devices') && method === 'POST') {
+  if (!isVacPath && path.endsWith('/devices') && method === 'POST') {
     try {
       const body = JSON.parse(options.body);
       const newDevice = {
@@ -279,7 +294,7 @@ export function mockFetch(url, options = {}) {
   }
 
   // --- Update device ---
-  if (path.match(/\/devices\//) && method === 'PUT') {
+  if (!isVacPath && path.match(/\/devices\//) && method === 'PUT') {
     const mac = decodeURIComponent(path.split('/devices/')[1]);
     const idx = mockDevices.findIndex(d => d.mac === mac);
     if (idx === -1) return Promise.resolve(jsonResponse({ detail: "Not found" }, 404));
@@ -295,14 +310,14 @@ export function mockFetch(url, options = {}) {
   }
 
   // --- Delete device ---
-  if (path.match(/\/devices\//) && method === 'DELETE') {
+  if (!isVacPath && path.match(/\/devices\//) && method === 'DELETE') {
     const mac = decodeURIComponent(path.split('/devices/')[1]);
     mockDevices = mockDevices.filter(d => d.mac !== mac);
     return Promise.resolve(jsonResponse({ status: "deleted" }));
   }
 
   // --- Status (device list) ---
-  if (path.endsWith('/status') && method === 'GET') {
+  if (!isVacPath && path.endsWith('/status') && method === 'GET') {
     let filtered = [...mockDevices];
     const statusFilter = urlObj.searchParams.get('status');
     const locationFilter = urlObj.searchParams.get('location');
