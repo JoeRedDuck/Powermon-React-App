@@ -209,8 +209,8 @@ export function mockFetch(url, options = {}) {
     }));
   }
 
-  // --- Device stats ---
-  if (path.endsWith('/device_stats')) {
+  // --- Device stats (power only — /vacuum/device_stats handled below) ---
+  if (path.endsWith('/device_stats') && !path.includes('/vacuum/')) {
     return Promise.resolve(jsonResponse(computeStats()));
   }
 
