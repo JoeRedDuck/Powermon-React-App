@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import RightIcon from "../assets/icons/chevron-right.svg";
 import { useAuth } from "../utils/AuthContext";
 import { getApiUrl } from "../utils/apiConfig";
@@ -90,7 +90,11 @@ export default function Menu () {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.page_container}>
         <TouchableOpacity onPress={() => router.push({pathname: "/addMonitor"})}>
           <View style={styles.settings_container}>
@@ -189,14 +193,18 @@ export default function Menu () {
           </View>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "space-between",
+    paddingBottom: 20,
   },
   settings_container: {
     height: 55,
