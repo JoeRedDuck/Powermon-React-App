@@ -80,7 +80,9 @@ export function NotificationProvider({ children }) {
     if (!(await isLoggedIn())) return;
     try {
       const apiBase = await getApiUrl();
-      const res = await fetchWithAuth(`${apiBase}/api/v1/notifications/history`);
+      const deviceId = await getDeviceId();
+      const url = `${apiBase}/api/v1/notifications/history?device_id=${encodeURIComponent(deviceId || "")}`;
+      const res = await fetchWithAuth(url);
       if (!res || !res.ok) return;
       const data = await res.json();
       if (!Array.isArray(data)) return;
