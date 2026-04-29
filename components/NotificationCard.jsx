@@ -64,12 +64,18 @@ export default function NotificationCard({ notification, onDismiss }) {
   const config = TYPE_CONFIG[type];
   const mac = data?.notification_mac || data?.mac;
 
-  const navigable =
-    (type === "new_monitor" && data?.notification_mac) || (type === "device_alert" && data?.mac);
+  const isNewMonitor = data?.type === "new_monitor" && data?.notification_mac;
+  const isNewVacMonitor = data?.type === "vac_monitor_discovered" && data?.notification_mac;
+  const isVacAlert = !!data?.mac && (data?.type === "vacuum_loss" || data?.type === "vac_offline");
+  const navigable = isNewMonitor || isNewVacMonitor || !!data?.mac;
 
   function handlePress() {
-    if (type === "new_monitor" && data?.notification_mac) {
+    if (isNewMonitor) {
       router.push({ pathname: "/addMonitor", params: { mac: data.notification_mac } });
+    } else if (isNewVacMonitor) {
+      router.push({ pathname: "/addVacMonitor", params: { mac: data.notification_mac } });
+    } else if (isVacAlert) {
+      router.push({ pathname: "/vacDevice", params: { mac: data.mac } });
     } else if (data?.mac) {
       router.push({ pathname: "/device", params: { mac: data.mac } });
     }
