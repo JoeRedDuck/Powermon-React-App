@@ -422,6 +422,34 @@ DELETE /api/v1/notifications/tokens/ExponentPushToken[xxxxxxxxxxxxx]
 
 ---
 
+### Notify New Monitor Discovered
+Called by powermon4 when it sees a MAC address that isn't in the database. Sends a push notification to all registered tokens so a user can tap through to add the monitor.
+```
+POST /api/v1/monitors/notify-discovered
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{
+  "mac": "AA:BB:CC:DD:EE:FF"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "notification sent"
+}
+```
+
+**Errors:**
+- `400` — `mac` field missing or empty
+
+**Note:** Tokens without a `device_name` are skipped (they cannot have mute preferences). The notification `data` payload includes `"notification_type": "new_monitor"` and `"mac": "AA:BB:CC:DD:EE:FF"` so the app can deep-link to the Add Monitor page with the MAC pre-filled.
+
+---
+
 ## 🔐 Authentication
 
 All auth endpoints use **Argon2id** for password hashing and **JWT (HS256)** for access tokens.
@@ -965,6 +993,108 @@ GET /api/v1/health
 
 ---
 
+## 🌫️ Vacuum Monitoring
+
+All vacuum endpoints sit under `/api/v1/vacuum/`. The data model mirrors the power side: `VacSystem` (PK = system_name) → `VacMonitor` (PK = mac) → `VacPoll`. Calibration (m=1.466, c=0.209) is applied to every `last_pressure` and graph point on the way out — DB stores raw Pirani readings.
+
+### List Vacuum Devices
+```
+GET /api/v1/vacuum/status?location=&status=
+GET /api/v1/vacuum/devices
+GET /api/v1/vacuum/devices/{mac}
+```
+`/status` returns each device with computed status (`online` / `offline` / `vacuum loss`) and calibrated `last_pressure`. `/devices/{mac}` is the detail variant used by the mobile app.
+
+### Vacuum Stats
+```
+GET /api/v1/vacuum/device_stats
+Response: {"online": 2, "offline": 1, "vacuum_loss": 0}
+```
+
+### Pressure History (graph)
+```
+GET /api/v1/vacuum/pressure?mac=...&time_range=...&bucket=...
+```
+Same `time_range` / `bucket` enums as `/power`. Returns `{ points: [{date, value}], min, max, average }` — all calibrated.
+
+### Vacuum Systems CRUD
+```
+GET    /api/v1/vacuum/systems                  # [{name, location, monitor_count}]
+POST   /api/v1/vacuum/systems                  # body: {name, location?}
+PUT    /api/v1/vacuum/systems/{name}           # body: {name?, location?} — name change cascades to monitors and poll history (deferred FK)
+DELETE /api/v1/vacuum/systems/{name}
+```
+
+### Vacuum Monitors CRUD
+```
+GET    /api/v1/vacuum/monitors                 # [{id, mac, system_name}]
+POST   /api/v1/vacuum/monitors                 # body: {id, mac, system_name?}
+DELETE /api/v1/vacuum/monitors/{id}            # cascades polls
+POST   /api/v1/vacuum/monitors/{id}/reassign?system_name=...
+POST   /api/v1/vacuum/monitors/{id}/unassign
+POST   /api/v1/vacuum/monitors/notify-discovered  # called by powermon4 on unknown MAC
+```
+
+### Polls (data ingestion)
+```
+POST /api/v1/vacuum/polls
+Body: {monitor_mac, pressure_mbar, voltage, poll_time?}
+```
+
+---
+
+## 📜 Notification History (April 2026)
+
+Server-side log of every push, with per-user dismissals. All endpoints require `Authorization: Bearer <access_token>`. See [EXPO_NOTIFICATIONS_GUIDE.md](EXPO_NOTIFICATIONS_GUIDE.md) for the channel/severity setup on the mobile side.
+
+### Get Notification History
+```
+GET /api/v1/notifications/history?device_id=<deviceName>
+```
+Returns active (undismissed) notifications for the logged-in user, newest first, last 30 days.
+
+When `device_id` is provided, alerts the device has muted — by severity (`mute_critical` / `mute_warning` on `NotificationToken`) or by machine (`DeviceMutePreference.muted_machines`) — are filtered out.
+
+```json
+[
+  {
+    "id": 1234,
+    "title": "Machine Alert",
+    "body": "Power Loss: Pump 2",
+    "createdAt": "2026-04-29T10:11:24+00:00",
+    "data": {
+      "severity": "critical",
+      "type": null,
+      "machines": ["Pump 2"],
+      "mac": "AA:BB:CC:11:22:06",
+      "notification_mac": null,
+      "createdAt": "2026-04-29T10:11:24+00:00",
+      "notification_id": 1234
+    }
+  }
+]
+```
+
+### Dismiss Single Notification
+```
+POST /api/v1/notifications/{notification_id}/dismiss
+Response: {"status": "dismissed"}
+```
+Idempotent. Returns `404` only if the notification doesn't exist (e.g. purged > 30 days old).
+
+### Dismiss All Active Notifications
+```
+POST /api/v1/notifications/dismiss-all
+Response: {"status": "dismissed", "count": 7}
+```
+
+### Push Payload Additions
+Every Expo message now includes:
+- `channelId` — `"critical"`, `"warning"`, or `"default"` (Android only, picks the matching channel for sound/importance)
+- `data.notification_id` — integer id used by the mobile app to dedupe between push delivery and history fetch
+
+---
+
 ## 🚨 Error Responses
 
 All error responses follow this format:
@@ -1073,6 +1203,18 @@ await POST('/api/v1/muted-machines', {
 **Poll Data:**
 - Get History: `GET /api/v1/power?mac={mac}&time_range={range}&bucket={bucket}`
 - Insert: `POST /api/v1/polls` (for external data sources)
+
+**Vacuum:**
+- Status: `GET /api/v1/vacuum/status`
+- Stats: `GET /api/v1/vacuum/device_stats`
+- Pressure history: `GET /api/v1/vacuum/pressure?mac=...&time_range=...&bucket=...`
+- Systems: `GET|POST /api/v1/vacuum/systems`, `PUT|DELETE /api/v1/vacuum/systems/{name}`
+- Monitors: `GET|POST /api/v1/vacuum/monitors`, `DELETE /api/v1/vacuum/monitors/{id}`, `POST .../reassign`, `POST .../unassign`
+
+**Notification History (auth required):**
+- List active for user: `GET /api/v1/notifications/history?device_id=...`
+- Dismiss one: `POST /api/v1/notifications/{id}/dismiss`
+- Dismiss all: `POST /api/v1/notifications/dismiss-all`
 
 **Always URL encode:**
 - Machine names with spaces
