@@ -190,7 +190,9 @@ DELETE /api/v1/devices/{mac}
 }
 ```
 
-**⚠️ Important:** Only use this for devices with a MAC address.
+**Behaviour (May 2026):** Deletes the machine row and the machine's poll history. **The attached monitor is preserved** — its `id` and MAC are unchanged, but its `machine_name` is set to NULL so it can be re-assigned to a new machine without re-adding the monitor.
+
+**⚠️ Important:** Only use this for devices that have an attached monitor (MAC available). For machines with no monitor, use the endpoint below.
 
 ---
 
@@ -210,6 +212,8 @@ DELETE /api/v1/machines/Pump%203
   "status": "deleted"
 }
 ```
+
+**Behaviour (May 2026):** Deletes the machine row and the machine's poll history. Any monitors that were attached are orphaned (`machine_name → NULL`), not deleted.
 
 **💡 Mobile App Code:**
 ```javascript
