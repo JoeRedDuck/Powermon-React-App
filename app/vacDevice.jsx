@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { VictoryAxis, VictoryChart, VictoryLine } from "victory-native";
 import GraphDropdown from "../components/graphDropdown.jsx";
@@ -9,6 +9,8 @@ import StatusPill from "../components/StatusPill";
 import VacuumGauge from "../components/VacuumGauge";
 import { getApiUrl } from "../utils/apiConfig.jsx";
 import useGetVacDevice from "../utils/getVacDevice.jsx";
+
+const PAUSE_DURATION_MINUTES = 5;
 
 export default function VacDevice () {
   const {mac} = useLocalSearchParams();
@@ -26,6 +28,18 @@ export default function VacDevice () {
   const [min, setMin] = useState("-")
   const [max, setMax] = useState("-")
   const [average, setAverage] = useState("-")
+  const [now, setNow] = useState(Date.now())
+  const [pauseBusy, setPauseBusy] = useState(false)
+  const pausedUntil = device?.alerts_paused_until
+    ? new Date(device.alerts_paused_until.endsWith("Z")
+        ? device.alerts_paused_until
+        : device.alerts_paused_until + "Z").getTime()
+    : null
+  const isPaused = pausedUntil != null && pausedUntil > now
+  const remainingMs = isPaused ? pausedUntil - now : 0
+  const remainingMin = Math.floor(remainingMs / 60000)
+  const remainingSec = Math.floor((remainingMs % 60000) / 1000)
+  const remainingLabel = `${remainingMin}:${String(remainingSec).padStart(2, "0")}`
   const TIME_OPTIONS = [
       {label: "Last 5 minutes", value: "5m", bucket: "10s"},
       {label: "Last 10 minutes", value: "10m", bucket: "10s"},
@@ -60,6 +74,35 @@ export default function VacDevice () {
       setApiBase('');
     });
   }, []);
+
+  useEffect(() => {
+    if (!isPaused) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isPaused]);
+
+  const togglePause = async () => {
+    if (!apiBase || !mac || pauseBusy) return;
+    setPauseBusy(true);
+    const url = `${apiBase.replace(/\/$/, "")}/api/v1/vacuum/${encodeURIComponent(mac)}/pause-alerts`;
+    try {
+      if (isPaused) {
+        const r = await fetch(url, { method: "DELETE" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      } else {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ minutes: PAUSE_DURATION_MINUTES }),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      }
+    } catch (err) {
+      console.error("toggle pause-alerts failed", err);
+    } finally {
+      setPauseBusy(false);
+    }
+  };
 
   useEffect(() => {
   if (!preferencesLoaded) return;
@@ -129,6 +172,19 @@ export default function VacDevice () {
         <View style={styles.gaugeCard}>
           <VacuumGauge pressure={device?.status !== "offline" ? device?.last_pressure : null} />
         </View>
+        <TouchableOpacity
+          style={[styles.pauseButton, isPaused ? styles.pauseButtonActive : null]}
+          onPress={togglePause}
+          activeOpacity={0.7}
+          disabled={pauseBusy}
+        >
+          <Text style={styles.pauseButtonTitle}>
+            {isPaused ? `Alerts paused · ${remainingLabel}` : `Pause alerts (${PAUSE_DURATION_MINUTES} min)`}
+          </Text>
+          <Text style={styles.pauseButtonSubtitle}>
+            {isPaused ? "Tap to resume now" : "Use when working on the system"}
+          </Text>
+        </TouchableOpacity>
         <View style={styles.graphCard}>
           <Text style={styles.axisLabel}>Pressure (mbar)</Text>
           <GraphDropdown
@@ -290,5 +346,29 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingVertical: 10
+  },
+  pauseButton: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 11,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  pauseButtonActive: {
+    backgroundColor: "#FEF3C7",
+    borderColor: "#F59E0B",
+  },
+  pauseButtonTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  pauseButtonSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 2,
   },
 });
