@@ -1,12 +1,13 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MetricCard from "../components/MetricCard";
+import VacuumGauge from "../components/VacuumGauge";
 import { getApiUrl } from "../utils/apiConfig";
 
 export default function Index() {
   const [deviceStats, setDeviceStats] = useState({})
-  const [vacStats, setVacStats] = useState({})
+  const [vacDevices, setVacDevices] = useState([])
   const [apiBase, setApiBase] = useState('')
   const [hasError, setHasError] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -25,7 +26,7 @@ export default function Index() {
 
     const fetch_stats = () => {
       const powerUrl = `${base}/device_stats`
-      const vacUrl = `${base}/vacuum/device_stats`
+      const vacUrl = `${base}/vacuum/status`
 
       Promise.all([
         fetch(powerUrl).then(r => {
@@ -35,20 +36,20 @@ export default function Index() {
         fetch(vacUrl).then(r => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return r.json();
-        }).catch(() => ({}))
+        }).catch(() => [])
       ])
         .then(([powerData, vacData]) => {
           setHasError(false);
           setLoading(false);
           setDeviceStats(powerData);
-          setVacStats(vacData);
+          setVacDevices(Array.isArray(vacData) ? vacData : []);
         })
         .catch(err => {
           console.error('stats fetch failed', err);
           setHasError(true);
           setLoading(false);
           setDeviceStats({});
-          setVacStats({});
+          setVacDevices([]);
         });
     }
     fetch_stats()
@@ -59,8 +60,10 @@ export default function Index() {
     };
     }, [base]);
 
-  const vacLossCount = vacStats.vacuum_loss ?? vacStats.high_pressure ?? 0;
-  const hasVacData = vacStats.online > 0 || vacStats.offline > 0 || vacLossCount > 0;
+  const vacDevice = vacDevices[0];
+  const vacStatusLabel = vacDevice?.status
+    ? vacDevice.status.charAt(0).toUpperCase() + vacDevice.status.slice(1)
+    : "";
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -77,24 +80,21 @@ export default function Index() {
           <MetricCard type="online" value={deviceStats["online"]} />
           <MetricCard type="offline" value={deviceStats["offline"]} />
 
-          {hasVacData && (
+          {vacDevice && (
             <>
-              <Text style={[styles.sectionTitle, {marginTop: 16}]}>Vacuum Monitoring</Text>
-              <MetricCard
-                type="vacuum loss"
-                value={vacLossCount}
-                onPress={() => router.push({ pathname: "/vacStatus", params: {status: "vacuum loss"}})}
-              />
-              <MetricCard
-                type="vac_online"
-                value={vacStats.online || 0}
-                onPress={() => router.push({ pathname: "/vacStatus", params: {status: "online"}})}
-              />
-              <MetricCard
-                type="vac_offline"
-                value={vacStats.offline || 0}
-                onPress={() => router.push({ pathname: "/vacStatus", params: {status: "offline"}})}
-              />
+              <Text style={[styles.sectionTitle, {marginTop: 16}]}>Vacuum System</Text>
+              <TouchableOpacity
+                style={styles.gaugeCard}
+                activeOpacity={0.7}
+                onPress={() => router.push({ pathname: "/vacDevice", params: { mac: vacDevice.mac } })}
+              >
+                <VacuumGauge
+                  pressure={vacDevice.status === "offline" ? null : vacDevice.last_pressure}
+                />
+                <Text style={styles.gaugeLabel}>
+                  {vacDevice.name}{vacStatusLabel ? ` · ${vacStatusLabel}` : ""}
+                </Text>
+              </TouchableOpacity>
             </>
           )}
         </>
@@ -132,6 +132,19 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-  }
+  },
+  gaugeCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: "center",
+  },
+  gaugeLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+    marginTop: 4,
+    textAlign: "center",
+  },
 })
-
