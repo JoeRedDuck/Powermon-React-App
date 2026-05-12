@@ -211,6 +211,13 @@ async function registerForPushNotificationsAsync() {
       sound: 'warning.wav',
       lightColor: '#F59E0B',
     });
+    await Notifications.setNotificationChannelAsync('anomaly', {
+      name: 'ML Anomaly Detections',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 200, 100, 200, 100, 200],
+      sound: 'warning.wav',
+      lightColor: '#8B5CF6',
+    });
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Info',
       importance: Notifications.AndroidImportance.DEFAULT,
