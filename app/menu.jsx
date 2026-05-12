@@ -11,6 +11,7 @@ export default function Menu () {
   const { logout, deleteAccount } = useAuth();
   const [muteCritical, setMuteCritical] = useState(false);
   const [muteWarning, setMuteWarning] = useState(false);
+  const [anomalyOptin, setAnomalyOptin] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -22,6 +23,7 @@ export default function Menu () {
           const data = await res.json();
           setMuteCritical(data.mute_critical);
           setMuteWarning(data.mute_warning);
+          setAnomalyOptin(!!data.anomaly_optin);
         }
       } catch {}
     })();
@@ -178,8 +180,33 @@ export default function Menu () {
           </View>
           <Text style={styles.toggleHint}>Single device offline or low power</Text>
         </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Experimental</Text>
+        </View>
+        <View style={styles.toggleContainer}>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleLabel}>
+              <View style={[styles.severityDot, { backgroundColor: "#8B5CF6" }]} />
+              <Text style={styles.optionText}>ML Anomaly Alerts</Text>
+            </View>
+            <Switch
+              value={anomalyOptin}
+              onValueChange={(val) => {
+                setAnomalyOptin(val);
+                togglePreference("anomaly_optin", val);
+              }}
+              trackColor={{ false: "#D1D5DB", true: "#DDD6FE" }}
+              thumbColor={anomalyOptin ? "#7C3AED" : "#9CA3AF"}
+            />
+          </View>
+          <Text style={styles.toggleHint}>
+            Opt in to early anomaly-detection pushes from the new ML models.
+            Default off; standard critical / warning alerts are unaffected.
+          </Text>
+        </View>
       </View>
-      
+
       <View style={styles.logoutWrapper}>
         <View style={styles.divider} />
         <TouchableOpacity onPress={handleLogout}>
