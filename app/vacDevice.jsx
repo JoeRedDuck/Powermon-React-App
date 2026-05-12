@@ -173,17 +173,24 @@ export default function VacDevice () {
           <VacuumGauge pressure={device?.status !== "offline" ? device?.last_pressure : null} />
         </View>
         <TouchableOpacity
-          style={[styles.pauseButton, isPaused ? styles.pauseButtonActive : null]}
+          style={[styles.pauseButton, isPaused ? styles.pauseButtonActive : styles.pauseButtonIdle]}
           onPress={togglePause}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
           disabled={pauseBusy}
         >
-          <Text style={styles.pauseButtonTitle}>
-            {isPaused ? `Alerts paused · ${remainingLabel}` : `Pause alerts (${PAUSE_DURATION_MINUTES} min)`}
-          </Text>
-          <Text style={styles.pauseButtonSubtitle}>
-            {isPaused ? "Tap to resume now" : "Use when working on the system"}
-          </Text>
+          <View style={styles.pauseIconCircle}>
+            <Text style={styles.pauseIcon}>{isPaused ? "▶" : "⏸"}</Text>
+          </View>
+          <View style={styles.pauseTextColumn}>
+            <Text style={styles.pauseButtonTitle}>
+              {isPaused ? `Resume alerts` : `Pause alerts for ${PAUSE_DURATION_MINUTES} min`}
+            </Text>
+            <Text style={styles.pauseButtonSubtitle}>
+              {isPaused
+                ? `Paused for everyone · ${remainingLabel} left`
+                : "Silences alerts for all users — use when working on the system"}
+            </Text>
+          </View>
         </TouchableOpacity>
         <View style={styles.graphCard}>
           <Text style={styles.axisLabel}>Pressure (mbar)</Text>
@@ -348,27 +355,50 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   pauseButton: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 11,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginTop: 10,
+    flexDirection: "row",
     alignItems: "center",
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  pauseButtonIdle: {
+    backgroundColor: "#F59E0B",
   },
   pauseButtonActive: {
-    backgroundColor: "#FEF3C7",
-    borderColor: "#F59E0B",
+    backgroundColor: "#DC2626",
+  },
+  pauseIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  pauseIcon: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  pauseTextColumn: {
+    flex: 1,
   },
   pauseButtonTitle: {
     fontSize: 17,
-    fontWeight: "600",
-    color: "#111827",
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.2,
   },
   pauseButtonSubtitle: {
-    fontSize: 13,
-    color: "#6B7280",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.92)",
     marginTop: 2,
   },
 });
