@@ -205,6 +205,14 @@ export default function Menu () {
             Default off; standard critical / warning alerts are unaffected.
           </Text>
         </View>
+        {/* TEMPORARY: activation rollout UI. Remove once every machine is */}
+        {/* activated and the workflow is stable. */}
+        <TouchableOpacity onPress={() => router.push({pathname: "/mlActivation"})}>
+          <View style={styles.settings_container}>
+            <Text style={styles.optionText}>ML Activation (temporary)</Text>
+            <RightIcon width={24} height={24} stroke="#6B7280"/>
+          </View>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.logoutWrapper}>

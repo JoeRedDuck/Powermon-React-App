@@ -248,6 +248,7 @@ function Topbar({ filterOpen, setFilterOpen }) {
     "/manageMonitors": "Manage Power Monitors",
     "/addMonitor": (typeof id === "string" && id.length) ? "Edit Power Monitor" : "Add Power Monitor",
     "/menu": "Settings",
+    "/mlActivation": "ML Activation",
     "/notifications": "Notifications",
     "/vacStatus": "Vacuum Systems",
     "/manageVacSystems": "Manage Vacuum Systems",
