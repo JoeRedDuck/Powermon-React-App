@@ -202,37 +202,27 @@ export default function VacDevice () {
         <View style={styles.gaugeCard}>
           <VacuumGauge pressure={device?.status !== "offline" ? device?.last_pressure : null} />
         </View>
-        <TouchableOpacity
-          style={styles.pauseCard}
-          onPress={togglePause}
-          activeOpacity={0.7}
-          disabled={pauseBusy}
-        >
-          <View
-            style={[styles.pauseAccent,
-              { backgroundColor: isPaused ? "#EF4444" : "#F59E0B" }]}
-          />
-          <View style={styles.pauseBody}>
-            <View style={styles.pauseRow}>
-              <Text style={styles.pauseTitle}>
-                {isPaused ? "Alerts Paused" : "Pause Alerts"}
-              </Text>
-              <View
-                style={[styles.pausePill,
-                  { backgroundColor: isPaused ? "#DC2626" : "#D97706" }]}
-              >
-                <Text style={styles.pausePillText}>
-                  {isPaused ? remainingLabel : `${PAUSE_DURATION_MINUTES} min`}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.pauseHint}>
+        <View style={styles.pauseSection}>
+          <TouchableOpacity
+            style={[styles.pauseButton,
+              isPaused ? styles.pauseButtonResume : styles.pauseButtonIdle,
+              pauseBusy && styles.pauseButtonBusy]}
+            onPress={togglePause}
+            activeOpacity={0.8}
+            disabled={pauseBusy}
+          >
+            <Text style={styles.pauseButtonText}>
               {isPaused
-                ? "Paused for everyone — tap to resume"
-                : "Silences alerts for all users while working on the system"}
+                ? `Resume Alerts  ·  ${remainingLabel}`
+                : `Pause Alerts for ${PAUSE_DURATION_MINUTES} Minutes`}
             </Text>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+          <Text style={styles.pauseHint}>
+            {isPaused
+              ? "Alerts are silenced for every user. Tap above to resume now."
+              : "Use when working on the system — silences vacuum alerts for everyone."}
+          </Text>
+        </View>
         <View style={styles.graphCard}>
           <Text style={styles.axisLabel}>Pressure (mbar)</Text>
           <GraphDropdown
@@ -395,50 +385,34 @@ const styles = StyleSheet.create({
   content: {
     paddingVertical: 10
   },
-  pauseCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E5E7EB",
-    borderWidth: 1,
-    borderRadius: 11,
-    flexDirection: "row",
+  pauseSection: {
     marginTop: 10,
-    overflow: "hidden",
   },
-  pauseAccent: {
-    width: 8,
-  },
-  pauseBody: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+  pauseButton: {
+    height: 48,
+    borderRadius: 10,
     justifyContent: "center",
-  },
-  pauseRow: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    paddingHorizontal: 16,
   },
-  pauseTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#111827",
+  pauseButtonIdle: {
+    backgroundColor: "#2563EA",
   },
-  pausePill: {
-    borderRadius: 9999,
-    height: 28,
-    minWidth: 70,
-    paddingHorizontal: 10,
-    alignItems: "center",
-    justifyContent: "center",
+  pauseButtonResume: {
+    backgroundColor: "#DC2626",
   },
-  pausePillText: {
-    fontSize: 12,
-    fontWeight: "800",
+  pauseButtonBusy: {
+    opacity: 0.6,
+  },
+  pauseButtonText: {
     color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 16,
   },
   pauseHint: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#6B7280",
     marginTop: 6,
+    marginHorizontal: 4,
   },
 });
