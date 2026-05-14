@@ -250,7 +250,17 @@ export default function VacDevice () {
           >
             <VictoryAxis
               dependentAxis
-              tickFormat={(tickValue) => Number(tickValue).toFixed(2)}
+              tickFormat={(tickValue, index, ticks) => {
+                const formatted = Number(tickValue).toFixed(2);
+                // Victory may place ticks closer than 0.01 apart, which would
+                // produce repeated labels like "1.34, 1.34, 1.35, 1.35".
+                // Hide any tick whose label has already appeared at an
+                // earlier index.
+                for (let i = 0; i < index; i++) {
+                  if (Number(ticks[i]).toFixed(2) === formatted) return "";
+                }
+                return formatted;
+              }}
               style={{
                 tickLabels: { fontSize: 10, fill: "#4B5563" },
               }}
