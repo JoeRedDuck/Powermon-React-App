@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 
 const MIN_PRESSURE = 0.1;
@@ -56,13 +56,8 @@ export default function VacuumGauge({ pressure }) {
   const hasPressure = pressure != null && pressure > 0;
   const needleAngle = hasPressure ? pressureToAngle(pressure) : START_ANGLE;
 
-  // Format display value
-  let displayValue = "—";
-  if (hasPressure) {
-    if (pressure >= 100) displayValue = pressure.toFixed(0);
-    else if (pressure >= 1) displayValue = pressure.toFixed(1);
-    else displayValue = pressure.toFixed(3);
-  }
+  // Format display value — always two decimal places
+  const displayValue = hasPressure ? pressure.toFixed(2) : "—";
 
   return (
     <View style={styles.container}>

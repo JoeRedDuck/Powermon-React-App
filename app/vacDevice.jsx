@@ -12,6 +12,11 @@ import useGetVacDevice from "../utils/getVacDevice.jsx";
 
 const PAUSE_DURATION_MINUTES = 5;
 
+const formatMbar = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(2) : "-";
+};
+
 export default function VacDevice () {
   const {mac} = useLocalSearchParams();
   const [graphPoints, setGraphPoints] = useState([]);
@@ -245,10 +250,7 @@ export default function VacDevice () {
           >
             <VictoryAxis
               dependentAxis
-              tickFormat={(tickValue) => {
-                if (tickValue >= 1) return tickValue.toFixed(1);
-                return tickValue.toFixed(3);
-              }}
+              tickFormat={(tickValue) => Number(tickValue).toFixed(2)}
               style={{
                 tickLabels: { fontSize: 10, fill: "#4B5563" },
               }}
@@ -279,15 +281,15 @@ export default function VacDevice () {
           <View style={styles.statisticsRow}>
             <View style={styles.statisticsColumn}>
               <Text style={styles.data}>Min</Text>
-              <Text style={styles.power}>{min} mbar</Text>
+              <Text style={styles.power}>{formatMbar(min)} mbar</Text>
             </View>
             <View style={styles.statisticsColumn}>
               <Text style={styles.data}>Max</Text>
-              <Text style={styles.power}>{max} mbar</Text>
+              <Text style={styles.power}>{formatMbar(max)} mbar</Text>
             </View>
             <View style={styles.statisticsColumn}>
               <Text style={styles.data}>Average</Text>
-              <Text style={styles.power}>{average} mbar</Text>
+              <Text style={styles.power}>{formatMbar(average)} mbar</Text>
             </View>
           </View>
         </View>
