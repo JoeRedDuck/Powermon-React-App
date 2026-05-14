@@ -30,11 +30,19 @@ export default function VacDevice () {
   const [average, setAverage] = useState("-")
   const [now, setNow] = useState(Date.now())
   const [pauseBusy, setPauseBusy] = useState(false)
-  const pausedUntil = device?.alerts_paused_until
+  // Optimistic override: takes effect the instant the user taps so the UI
+  // doesn't wait up to 5s for the next useGetVacDevice poll to reflect the
+  // new alerts_paused_until value. Cleared once the server-confirmed value
+  // catches up.
+  const [optimisticPausedUntil, setOptimisticPausedUntil] = useState(null)
+  const serverPausedUntil = device?.alerts_paused_until
     ? new Date(device.alerts_paused_until.endsWith("Z")
         ? device.alerts_paused_until
         : device.alerts_paused_until + "Z").getTime()
     : null
+  const pausedUntil = optimisticPausedUntil !== null
+    ? optimisticPausedUntil
+    : serverPausedUntil
   const isPaused = pausedUntil != null && pausedUntil > now
   const remainingMs = isPaused ? pausedUntil - now : 0
   const remainingMin = Math.floor(remainingMs / 60000)
@@ -81,24 +89,46 @@ export default function VacDevice () {
     return () => clearInterval(id);
   }, [isPaused]);
 
+  // Clear the optimistic override once the polled device state catches up
+  // (or contradicts us). Without this, a stale optimistic value would stick
+  // forever after the server-confirmed timestamp arrives.
+  useEffect(() => {
+    if (optimisticPausedUntil === null) return;
+    if (optimisticPausedUntil === 0) {
+      if (serverPausedUntil === null || serverPausedUntil <= Date.now()) {
+        setOptimisticPausedUntil(null);
+      }
+    } else if (serverPausedUntil !== null
+               && Math.abs(serverPausedUntil - optimisticPausedUntil) < 5000) {
+      setOptimisticPausedUntil(null);
+    }
+  }, [serverPausedUntil, optimisticPausedUntil]);
+
   const togglePause = async () => {
     if (!apiBase || !mac || pauseBusy) return;
+    const willPause = !isPaused;
+    // Optimistic update — flip the UI immediately, before the network call.
+    setOptimisticPausedUntil(
+      willPause ? Date.now() + PAUSE_DURATION_MINUTES * 60 * 1000 : 0
+    );
     setPauseBusy(true);
     const url = `${apiBase.replace(/\/$/, "")}/api/v1/vacuum/${encodeURIComponent(mac)}/pause-alerts`;
     try {
-      if (isPaused) {
-        const r = await fetch(url, { method: "DELETE" });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      } else {
+      if (willPause) {
         const r = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ minutes: PAUSE_DURATION_MINUTES }),
         });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      } else {
+        const r = await fetch(url, { method: "DELETE" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
       }
     } catch (err) {
       console.error("toggle pause-alerts failed", err);
+      // Revert the optimistic flip on error so the UI stays truthful.
+      setOptimisticPausedUntil(null);
     } finally {
       setPauseBusy(false);
     }
@@ -173,22 +203,33 @@ export default function VacDevice () {
           <VacuumGauge pressure={device?.status !== "offline" ? device?.last_pressure : null} />
         </View>
         <TouchableOpacity
-          style={[styles.pauseButton, isPaused ? styles.pauseButtonActive : styles.pauseButtonIdle]}
+          style={styles.pauseCard}
           onPress={togglePause}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
           disabled={pauseBusy}
         >
-          <View style={styles.pauseIconCircle}>
-            <Text style={styles.pauseIcon}>{isPaused ? "▶" : "⏸"}</Text>
-          </View>
-          <View style={styles.pauseTextColumn}>
-            <Text style={styles.pauseButtonTitle}>
-              {isPaused ? `Resume alerts` : `Pause alerts for ${PAUSE_DURATION_MINUTES} min`}
-            </Text>
-            <Text style={styles.pauseButtonSubtitle}>
+          <View
+            style={[styles.pauseAccent,
+              { backgroundColor: isPaused ? "#EF4444" : "#F59E0B" }]}
+          />
+          <View style={styles.pauseBody}>
+            <View style={styles.pauseRow}>
+              <Text style={styles.pauseTitle}>
+                {isPaused ? "Alerts Paused" : "Pause Alerts"}
+              </Text>
+              <View
+                style={[styles.pausePill,
+                  { backgroundColor: isPaused ? "#DC2626" : "#D97706" }]}
+              >
+                <Text style={styles.pausePillText}>
+                  {isPaused ? remainingLabel : `${PAUSE_DURATION_MINUTES} min`}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.pauseHint}>
               {isPaused
-                ? `Paused for everyone · ${remainingLabel} left`
-                : "Silences alerts for all users — use when working on the system"}
+                ? "Paused for everyone — tap to resume"
+                : "Silences alerts for all users while working on the system"}
             </Text>
           </View>
         </TouchableOpacity>
@@ -354,51 +395,50 @@ const styles = StyleSheet.create({
   content: {
     paddingVertical: 10
   },
-  pauseButton: {
+  pauseCard: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#E5E7EB",
+    borderWidth: 1,
+    borderRadius: 11,
+    flexDirection: "row",
+    marginTop: 10,
+    overflow: "hidden",
+  },
+  pauseAccent: {
+    width: 8,
+  },
+  pauseBody: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    justifyContent: "center",
+  },
+  pauseRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: "space-between",
   },
-  pauseButtonIdle: {
-    backgroundColor: "#F59E0B",
+  pauseTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111827",
   },
-  pauseButtonActive: {
-    backgroundColor: "#DC2626",
-  },
-  pauseIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.22)",
+  pausePill: {
+    borderRadius: 9999,
+    height: 28,
+    minWidth: 70,
+    paddingHorizontal: 10,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 14,
   },
-  pauseIcon: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  pauseTextColumn: {
-    flex: 1,
-  },
-  pauseButtonTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.2,
-  },
-  pauseButtonSubtitle: {
+  pausePillText: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.92)",
-    marginTop: 2,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  pauseHint: {
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 6,
   },
 });
