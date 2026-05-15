@@ -17,6 +17,35 @@ const formatMbar = (v) => {
   return Number.isFinite(n) ? n.toFixed(2) : "-";
 };
 
+// Build evenly-spaced y-axis ticks for the vacuum graph. Step size is
+// snapped to 1 / 2 / 5 × 10^k (like D3's nice-tick algorithm) and clamped
+// to ≥ 0.01 so each tick rounds to a unique 2-dp label and the gaps
+// between labels stay even — Victory's auto-chosen ticks could otherwise
+// land within 0.01 of each other and round to repeated values.
+function buildVacTicks(yMin, yMax, targetCount = 5) {
+  if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) return undefined;
+  if (yMin === yMax) {
+    return [Math.round(yMin * 100) / 100];
+  }
+  const span = yMax - yMin;
+  const rawStep = span / targetCount;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const normalized = rawStep / magnitude;
+  let step;
+  if (normalized < 1.5) step = 1 * magnitude;
+  else if (normalized < 3) step = 2 * magnitude;
+  else if (normalized < 7) step = 5 * magnitude;
+  else step = 10 * magnitude;
+  step = Math.max(step, 0.01);
+  const tickMin = Math.floor(yMin / step) * step;
+  const tickMax = Math.ceil(yMax / step) * step;
+  const ticks = [];
+  for (let v = tickMin; v <= tickMax + step / 2; v += step) {
+    ticks.push(Math.round(v * 100) / 100);
+  }
+  return ticks;
+}
+
 export default function VacDevice () {
   const {mac} = useLocalSearchParams();
   const [graphPoints, setGraphPoints] = useState([]);
@@ -30,6 +59,9 @@ export default function VacDevice () {
   const [apiBase, setApiBase] = useState('');
   const yValues = graphPoints.map((point) => point.value);
   const hasNonZeroData = yValues.some((value) => value !== 0);
+  const yTicks = hasNonZeroData
+    ? buildVacTicks(Math.min(...yValues), Math.max(...yValues))
+    : undefined;
   const [min, setMin] = useState("-")
   const [max, setMax] = useState("-")
   const [average, setAverage] = useState("-")
@@ -139,6 +171,28 @@ export default function VacDevice () {
     }
   };
 
+  const extendPause = async () => {
+    if (!apiBase || !mac || pauseBusy || !isPaused) return;
+    // Stack the extension on top of whatever target is currently displayed.
+    const newTarget = pausedUntil + PAUSE_DURATION_MINUTES * 60 * 1000;
+    setOptimisticPausedUntil(newTarget);
+    setPauseBusy(true);
+    const url = `${apiBase.replace(/\/$/, "")}/api/v1/vacuum/${encodeURIComponent(mac)}/pause-alerts/extend`;
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minutes: PAUSE_DURATION_MINUTES }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    } catch (err) {
+      console.error("extend pause-alerts failed", err);
+      setOptimisticPausedUntil(null);
+    } finally {
+      setPauseBusy(false);
+    }
+  };
+
   useEffect(() => {
   if (!preferencesLoaded) return;
   if (!apiBase) return;
@@ -222,6 +276,18 @@ export default function VacDevice () {
                 : `Pause Alerts for ${PAUSE_DURATION_MINUTES} Minutes`}
             </Text>
           </TouchableOpacity>
+          {isPaused && (
+            <TouchableOpacity
+              style={[styles.extendButton, pauseBusy && styles.pauseButtonBusy]}
+              onPress={extendPause}
+              activeOpacity={0.8}
+              disabled={pauseBusy}
+            >
+              <Text style={styles.extendButtonText}>
+                + {PAUSE_DURATION_MINUTES} Minutes
+              </Text>
+            </TouchableOpacity>
+          )}
           <Text style={styles.pauseHint}>
             {isPaused
               ? "Alerts are silenced for every user. Tap above to resume now."
@@ -250,17 +316,8 @@ export default function VacDevice () {
           >
             <VictoryAxis
               dependentAxis
-              tickFormat={(tickValue, index, ticks) => {
-                const formatted = Number(tickValue).toFixed(2);
-                // Victory may place ticks closer than 0.01 apart, which would
-                // produce repeated labels like "1.34, 1.34, 1.35, 1.35".
-                // Hide any tick whose label has already appeared at an
-                // earlier index.
-                for (let i = 0; i < index; i++) {
-                  if (Number(ticks[i]).toFixed(2) === formatted) return "";
-                }
-                return formatted;
-              }}
+              tickValues={yTicks}
+              tickFormat={(tickValue) => Number(tickValue).toFixed(2)}
               style={{
                 tickLabels: { fontSize: 10, fill: "#4B5563" },
               }}
@@ -426,5 +483,21 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 6,
     marginHorizontal: 4,
+  },
+  extendButton: {
+    height: 48,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#DC2626",
+  },
+  extendButtonText: {
+    color: "#DC2626",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
