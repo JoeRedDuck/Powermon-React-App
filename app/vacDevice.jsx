@@ -261,39 +261,6 @@ export default function VacDevice () {
         <View style={styles.gaugeCard}>
           <VacuumGauge pressure={device?.status !== "offline" ? device?.last_pressure : null} />
         </View>
-        <View style={styles.pauseSection}>
-          <TouchableOpacity
-            style={[styles.pauseButton,
-              isPaused ? styles.pauseButtonResume : styles.pauseButtonIdle,
-              pauseBusy && styles.pauseButtonBusy]}
-            onPress={togglePause}
-            activeOpacity={0.8}
-            disabled={pauseBusy}
-          >
-            <Text style={styles.pauseButtonText}>
-              {isPaused
-                ? `Resume Alerts  ·  ${remainingLabel}`
-                : `Pause Alerts for ${PAUSE_DURATION_MINUTES} Minutes`}
-            </Text>
-          </TouchableOpacity>
-          {isPaused && (
-            <TouchableOpacity
-              style={[styles.extendButton, pauseBusy && styles.pauseButtonBusy]}
-              onPress={extendPause}
-              activeOpacity={0.8}
-              disabled={pauseBusy}
-            >
-              <Text style={styles.extendButtonText}>
-                + {PAUSE_DURATION_MINUTES} Minutes
-              </Text>
-            </TouchableOpacity>
-          )}
-          <Text style={styles.pauseHint}>
-            {isPaused
-              ? "Alerts are silenced for every user. Tap above to resume now."
-              : "Use when working on the system — silences vacuum alerts for everyone."}
-          </Text>
-        </View>
         <View style={styles.graphCard}>
           <Text style={styles.axisLabel}>Pressure (mbar)</Text>
           <GraphDropdown
@@ -359,6 +326,34 @@ export default function VacDevice () {
               <Text style={styles.power}>{formatMbar(average)} mbar</Text>
             </View>
           </View>
+        </View>
+        <View style={styles.pauseSection}>
+          <TouchableOpacity
+            style={[styles.pauseButton,
+              isPaused ? styles.pauseButtonResume : styles.pauseButtonIdle,
+              pauseBusy && styles.pauseButtonBusy]}
+            onPress={togglePause}
+            activeOpacity={0.8}
+            disabled={pauseBusy}
+          >
+            <Text style={styles.pauseButtonText}>
+              {isPaused
+                ? `Resume Alerts  ·  ${remainingLabel}`
+                : `Pause Alerts for ${PAUSE_DURATION_MINUTES} Minutes`}
+            </Text>
+          </TouchableOpacity>
+          {isPaused && (
+            <TouchableOpacity
+              style={[styles.extendButton, pauseBusy && styles.pauseButtonBusy]}
+              onPress={extendPause}
+              activeOpacity={0.8}
+              disabled={pauseBusy}
+            >
+              <Text style={styles.extendButtonText}>
+                + {PAUSE_DURATION_MINUTES} Minutes
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
       <View style={styles.graph}></View>
