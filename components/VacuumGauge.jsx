@@ -56,8 +56,9 @@ export default function VacuumGauge({ pressure }) {
   const hasPressure = pressure != null && pressure > 0;
   const needleAngle = hasPressure ? pressureToAngle(pressure) : START_ANGLE;
 
-  // Format display value — always two decimal places
-  const displayValue = hasPressure ? pressure.toFixed(2) : "—";
+  // Format display value — always three decimal places. Stats row and graph
+  // axis stay at 2 dp; the gauge is the spot users zoom in on for precision.
+  const displayValue = hasPressure ? pressure.toFixed(3) : "—";
 
   return (
     <View style={styles.container}>

@@ -132,6 +132,10 @@ export default function Device () {
             <Text style={styles.label}>Location:</Text>
             <Text style={styles.data}>{device?.location}</Text>
           </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Low Power Threshold:</Text>
+            <Text style={styles.data}>{(device?.low_power_threshold ?? 50)} W</Text>
+          </View>
         </View>
         <View style={styles.graphCard}>
           <GraphDropdown

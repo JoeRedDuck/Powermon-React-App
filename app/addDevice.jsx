@@ -13,6 +13,7 @@ export default function AddDevice () {
   // const [ip, setIp] = useState("");
   const [location, setLocation] = useState("");
   const [machineType, setMachineType] = useState("");
+  const [lowPowerThreshold, setLowPowerThreshold] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null)
   const [isEdit, setIsEdit] = useState(false);
@@ -36,6 +37,7 @@ export default function AddDevice () {
   // setIp("");
   setLocation("");
   setMachineType("");
+  setLowPowerThreshold("");
   }
 
   const fetchDevice = async (machineNameToGet) => {
@@ -91,6 +93,9 @@ export default function AddDevice () {
     // setIp(device.ip || '');
     setLocation(device.location || '');
     setMachineType(device.machine_type || '');
+    setLowPowerThreshold(
+      device.low_power_threshold != null ? String(device.low_power_threshold) : ''
+    );
   }, [isEdit, device]);
 
   useEffect(() => {
@@ -151,6 +156,13 @@ export default function AddDevice () {
         machine_type: machineType,
         location: location
       };
+      // Per-device low-power threshold is optional. Only include when the
+      // user typed a number — leaving it blank means "don't touch the value"
+      // on a PUT (matches the backend's partial-PUT convention).
+      if (lowPowerThreshold !== "") {
+        const parsed = parseInt(lowPowerThreshold, 10);
+        if (Number.isFinite(parsed)) payload.low_power_threshold = parsed;
+      }
 
       const api_call = isEdit ? `${base}/devices/${mac}` : `${base}/devices`;
       const method = isEdit ? "PUT" : "POST";
@@ -246,13 +258,28 @@ export default function AddDevice () {
 
       <View>
         <Text style={styles.label}>Location:</Text>
-        <TextInput 
+        <TextInput
           style={styles.input}
           placeholder="Production Line"
           placeholderTextColor="#9CA3AF"
           value={location}
           onChangeText={setLocation}>
         </TextInput>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Low Power Threshold (W):</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="50"
+          placeholderTextColor="#9CA3AF"
+          value={lowPowerThreshold}
+          onChangeText={(v) => setLowPowerThreshold(v.replace(/[^0-9]/g, ''))}
+          keyboardType="numeric"
+        />
+        <Text style={styles.hint}>
+          Devices alert as &quot;low power&quot; below this many watts. Leave blank for the default (50 W).
+        </Text>
       </View>
 
 
@@ -349,6 +376,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 20,
+  },
+  hint: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 4,
+    marginHorizontal: 2,
   },
   submitButton: {
     backgroundColor: "#2563EA",
