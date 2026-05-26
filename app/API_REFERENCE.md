@@ -1,7 +1,7 @@
 # Power Monitoring API Reference
 **For Frontend Developers**
 
-Base URL: `http://your-server:8000`
+Base URL: `http://tapomon:8000`
 
 ---
 
@@ -41,6 +41,7 @@ GET /api/v1/devices
 **Notes:**
 - Devices without monitors will have `mac: null` and `id: null`
 - `last_seen` and `last_power` will be `null` if no data received yet
+- `low_power_threshold` (integer or `null`) is the per-machine override for the "low power" alert bar in watts. `null` means use the global default (50 W). Settable via `POST/PUT /api/v1/devices`.
 
 ---
 
@@ -295,6 +296,8 @@ GET /api/v1/power?mac=AA:BB:CC:DD:EE:FF&time_range=1h&bucket=1m
   "average": 483
 }
 ```
+
+`points` are bucket averages (smoothed for graphing). `min`, `max`, and `average` are computed from the **raw polls** within `time_range` (excluding offline/NULL readings), so they are independent of the chosen `bucket` size and consistent across overlapping ranges.
 
 ---
 
@@ -1007,7 +1010,19 @@ GET /api/v1/vacuum/status?location=&status=
 GET /api/v1/vacuum/devices
 GET /api/v1/vacuum/devices/{mac}
 ```
-`/status` returns each device with computed status (`online` / `offline` / `vacuum loss`) and calibrated `last_pressure`. `/devices/{mac}` is the detail variant used by the mobile app.
+`/status` returns each device with computed status (`online` / `offline` / `vacuum loss`), calibrated `last_pressure`, and `alerts_paused_until` (UTC ISO string or `null` — see *Pause Vacuum Alerts* below). `/devices/{mac}` is the detail variant used by the mobile app and returns the same field.
+
+### Pause Vacuum Alerts
+```
+POST   /api/v1/vacuum/{mac}/pause-alerts          # body: {minutes?: 1..240, default 5}
+POST   /api/v1/vacuum/{mac}/pause-alerts/extend   # body: {minutes?: 1..240, default 5}
+DELETE /api/v1/vacuum/{mac}/pause-alerts          # resume immediately
+```
+Suppresses both `vacuum loss` and `vacuum offline` push notifications for the system that owns this monitor for the requested window. Used when someone is working on the system and intentionally breaking vacuum / disconnecting the monitor. The pause is global (every Expo token sees the suppression), persisted in `vac_system.alerts_paused_until`, and surfaces in the `/status` and `/devices/{mac}` responses so the mobile app can show a live countdown.
+
+**Extend** adds `minutes` to the current `paused_until` (stacking, so repeated calls keep pushing the resume time out). If there's no active pause it falls back to a fresh pause from now.
+
+**Resume behaviour:** `vac_alert_monitor` keeps paused systems in its in-memory `alerted_systems` set across the pause window, so if the system is *still* in the same alert state it was in before the pause (or first observed during the pause), **no** notification fires when the pause expires — the user already saw the alert. Genuinely new alert conditions that surface only after the pause ends still fire normally.
 
 ### Vacuum Stats
 ```
@@ -1219,6 +1234,17 @@ await POST('/api/v1/muted-machines', {
 - List active for user: `GET /api/v1/notifications/history?device_id=...`
 - Dismiss one: `POST /api/v1/notifications/{id}/dismiss`
 - Dismiss all: `POST /api/v1/notifications/dismiss-all`
+
+**Notification preferences** (`GET|PUT /api/v1/notifications/preferences`) — the response/body shape now includes `anomaly_optin: bool` alongside `mute_critical` and `mute_warning`. Anomaly pushes (`severity="anomaly"`) are **opt-in per device**: default `false`, and `send_expo_notification` silently drops anomaly pushes for any token whose owner hasn't enabled it. Critical and warning routing is unchanged.
+
+**ML Anomaly Detection:**
+- Activate a power machine (start collecting): `POST /api/v1/ml/machines/{machine_name}/activate`
+- Deactivate (back to standby, discards model): `DELETE /api/v1/ml/machines/{machine_name}/activate`
+- Activate a vacuum system: `POST /api/v1/ml/vacuum/{system_name}/activate`
+- Deactivate a vacuum system: `DELETE /api/v1/ml/vacuum/{system_name}/activate`
+- List all ML rows (both kinds, all states): `GET /api/v1/ml/status`
+
+Each ML row goes through `standby → collecting → active`. Activation just flips `standby → collecting` and records `collection_start_time`; the background `ml_retrain_loop` (hourly) trains an Isolation Forest for power machines and a slope-distribution baseline for vacuum systems once enough polls have accumulated *after* `collection_start_time`, then flips the row to `active` and starts emitting `severity="anomaly"` push notifications (channel `anomaly` on Android) when 3 consecutive polls fall outside the learned distribution. Active models retrain every 7 days, capped at the most recent 200 000 polls to bound memory. Activating again on an already-collecting/active row is idempotent and does not reset the clock.
 
 **Always URL encode:**
 - Machine names with spaces
