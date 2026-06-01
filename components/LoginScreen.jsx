@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import {
     ActivityIndicator,
@@ -224,6 +225,16 @@ export default function LoginScreen({ onLoginSuccess }) {
               </Text>
             )}
           </TouchableOpacity>
+
+          {mode === "login" && (
+            <TouchableOpacity
+              onPress={() => router.push("/forgotPassword")}
+              style={styles.forgotLink}
+              disabled={loading}
+            >
+              <Text style={styles.forgotLinkText}>Forgot password?</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* API URL Section */}
@@ -347,6 +358,16 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "bold",
     fontSize: 17,
+  },
+  forgotLink: {
+    alignItems: "center",
+    marginTop: 12,
+    paddingVertical: 6,
+  },
+  forgotLinkText: {
+    color: "#60A5FA",
+    fontSize: 14,
+    textDecorationLine: "underline",
   },
   apiToggle: {
     alignItems: "center",

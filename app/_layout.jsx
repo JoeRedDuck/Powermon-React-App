@@ -128,8 +128,14 @@ export default function RootLayout() {
     );
   }
 
-  // Show login screen if not authenticated
-  if (!authenticated) {
+  // Pre-auth flows (forgot/reset password) must render even when the user
+  // isn't logged in — they're reached from the login screen or from an
+  // emailed deep link `powermon://resetPassword?code=...`. Render them
+  // through the Stack without the topbar/bottombar so the layout doesn't
+  // imply they're inside the authenticated app.
+  const isAuthFlow = pathname === "/forgotPassword" || pathname === "/resetPassword";
+
+  if (!authenticated && !isAuthFlow) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView style={{ backgroundColor: "#0F1724", flex: 1 }}>
@@ -140,6 +146,16 @@ export default function RootLayout() {
             });
             setAuthenticated(true);
           }} />
+        </SafeAreaView>
+      </GestureHandlerRootView>
+    );
+  }
+
+  if (isAuthFlow) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={{ backgroundColor: "#0F1724", flex: 1 }}>
+          <Stack screenOptions={{ headerShown: false }} />
         </SafeAreaView>
       </GestureHandlerRootView>
     );
