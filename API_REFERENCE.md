@@ -626,13 +626,15 @@ Content-Type: application/json
 
 **Response (200):**
 ```json
-{ "status": "ok", "reset_code": "..." }
+{ "status": "ok" }
 ```
 
 **Notes:**
-- Always returns `{ "status": "ok" }` even if the email doesn't exist (prevents user enumeration)
-- Reset code is generated using `itsdangerous.URLSafeTimedSerializer` and is valid for 1 hour
-- In production, the reset code should be emailed instead of returned in the response
+- Always returns `{ "status": "ok" }` whether or not the email exists (prevents user enumeration).
+- The reset code is **never** returned in the API response — it's emailed to the user via SMTP. (Previously the endpoint leaked the code; that was an account-takeover hole. Fixed.)
+- Reset code is generated using `itsdangerous.URLSafeTimedSerializer` and is valid for 1 hour.
+- The email body contains a deep link `powermon://resetPassword?code=...` plus the raw code as a fallback.
+- SMTP delivery is best-effort: the endpoint returns success even if the email fails to send (so a broken SMTP doesn't leak which addresses are registered). Operators can grep `journalctl` for `[email]` lines to debug delivery.
 
 ---
 
@@ -1034,7 +1036,31 @@ Response: {"online": 2, "offline": 1, "vacuum_loss": 0}
 ```
 GET /api/v1/vacuum/pressure?mac=...&time_range=...&bucket=...
 ```
-Same `time_range` / `bucket` enums as `/power`. Returns `{ points: [{date, value}], min, max, average }` — all calibrated.
+
+**Valid `time_range` values:** `5m`, `10m`, `30m`, `1h`, `3h`, `6h`, `12h`, `24h`, `3d`, `7d`, `30d`.
+**Valid `bucket` values:** `10s`, `20s`, `30s`, `1m`, `2m`, `5m`, `10m`, `30m`, `1h`, `4h`, `12h`, `1d`.
+
+**Response shape:**
+```json
+{
+  "mac": "...",
+  "time_range": "30d",
+  "bucket": "1h",
+  "points": [
+    { "date": "2026-05-20T10:00:00Z",
+      "value": 0.4612,   // bucket mean (calibrated mbar)
+      "min": 0.4321,     // smallest calibrated reading in the bucket
+      "max": 1.8734 }    // largest calibrated reading in the bucket — useful for spike detection
+  ],
+  "min": 0.4,        // top-level summary: min across raw polls
+  "max": 2.1,        // top-level summary: max across raw polls
+  "average": 0.51
+}
+```
+
+`value` is the per-bucket mean (used by the mobile app's existing line graph). `min` and `max` are emitted per-bucket so spike-preserving renderings (band charts, candlesticks) can be built without losing transient events to averaging — important for long-time-range views like the planned web-app monthly graph where a 1-hour bucket would otherwise smooth a 5-minute vacuum-loss spike into invisibility. All four values are calibrated mbar.
+
+The **top-level** `min` / `max` / `average` are computed from the raw polls within the window (not from the bucket aggregates), so they're consistent across `time_range` / `bucket` choices.
 
 ### Vacuum Systems CRUD
 ```
