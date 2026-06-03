@@ -17,34 +17,53 @@ const formatMbar = (v) => {
   return Number.isFinite(n) ? n.toFixed(2) : "-";
 };
 
-// Build log-scale y-axis ticks for the vacuum graph. Vacuum data spans a
-// huge dynamic range (deep-vacuum ~0.3 mbar normal operation up to ~1000
-// mbar atmospheric, with spikes anywhere in between). Linear scale lets
-// one decade dominate and squashes the rest into a flat line. Log scale
-// keeps small-but-meaningful changes in deep vacuum visible at the same
-// time as a vacuum-loss spike to 10+ mbar.
+// Hybrid linear/log y-axis config for the vacuum graph. Returns scale
+// type, ticks, and domain together so they stay in sync.
 //
-// Strategy:
-//   1. Try decade-aligned ticks (0.1, 1, 10, ...) plus 2× / 5× within
-//      each decade when ≤ 2 decades are visible.
-//   2. If that leaves us with fewer than 3 ticks inside the data window
-//      (which happens on short time ranges where the data is tightly
-//      clustered, e.g. 0.44 - 0.46 mbar), fall back to evenly-spaced
-//      linear nice-ticks. The axis is still log-scaled; only the *label
-//      positions* are picked linearly. For sub-2× data ranges the visual
-//      difference between log and linear is tiny anyway.
-function buildVacLogTicks(yMin, yMax) {
-  if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) return undefined;
-  // Log can't represent zero or negative. Calibrated pressure should never
-  // go below ~0.2 mbar given the calibration offset, but defend anyway.
+// Rationale: pure log scale handles vacuum-loss spikes well (4 decades
+// of dynamic range fit on one chart) but looks empty and badly-labelled
+// during normal operation where data is in a narrow band like 0.68-0.69
+// mbar. So:
+//
+//   • Data spans < 1 decade (yMax / yMin < 10) → LINEAR scale, tight
+//     domain, linear nice-ticks. Looks like the pre-log graph.
+//   • Data spans ≥ 1 decade (e.g. a real vacuum-loss event from 0.5 →
+//     50 mbar in the same window) → LOG scale, decade-aligned ticks.
+//
+// The scale type swap happens automatically as the data range changes.
+// In normal operation users always see the linear view; only during an
+// actual spike does the chart switch to log so they can see both ends.
+function buildVacGraphConfig(yMin, yMax) {
+  if (!Number.isFinite(yMin) || !Number.isFinite(yMax)
+      || yMin <= 0 || yMax <= 0) {
+    return { scale: "linear", ticks: undefined, domain: [0, 1] };
+  }
   const safeMin = Math.max(yMin, 0.01);
-  const safeMax = Math.max(yMax, safeMin * 1.1);
-  const logMin = Math.floor(Math.log10(safeMin));
-  const logMax = Math.ceil(Math.log10(safeMax));
-  const includeMinors = (logMax - logMin) <= 2;
+  const safeMax = Math.max(yMax, safeMin * 1.001);
+
+  const dynamicRange = safeMax / safeMin;
+
+  if (dynamicRange < 10) {
+    // Normal-operation view. Linear scale, ticks from the existing
+    // nice-tick algorithm, domain padded ~10% of the data span. This
+    // is what the user sees 99% of the time.
+    const span = safeMax - safeMin;
+    const pad = Math.max(span * 0.1, 0.005);
+    return {
+      scale: "linear",
+      ticks: buildLinearTicks(safeMin, safeMax),
+      domain: [safeMin - pad, safeMax + pad],
+    };
+  }
+
+  // Spike-event view. Log scale, decade-aligned ticks (plus 2x / 5x
+  // intermediates when ≤ 2 decades are visible).
+  const logFloor = Math.floor(Math.log10(safeMin));
+  const logCeil  = Math.ceil(Math.log10(safeMax));
+  const includeMinors = (logCeil - logFloor) <= 2;
 
   const decadeTicks = [];
-  for (let p = logMin; p <= logMax; p++) {
+  for (let p = logFloor; p <= logCeil; p++) {
     const decade = Math.pow(10, p);
     decadeTicks.push(decade);
     if (includeMinors) {
@@ -52,13 +71,19 @@ function buildVacLogTicks(yMin, yMax) {
       decadeTicks.push(5 * decade);
     }
   }
-  const filtered = decadeTicks.filter(
+  const ticksInRange = decadeTicks.filter(
     (t) => t >= safeMin * 0.5 && t <= safeMax * 2,
   );
-  if (filtered.length >= 3) return filtered;
-
-  // Narrow range — use linear nice-ticks for label positioning.
-  return buildLinearTicks(safeMin, safeMax);
+  const tickMin = ticksInRange.length ? Math.min(...ticksInRange) : safeMin;
+  const tickMax = ticksInRange.length ? Math.max(...ticksInRange) : safeMax;
+  return {
+    scale: "log",
+    ticks: ticksInRange.length ? ticksInRange : undefined,
+    domain: [
+      Math.min(tickMin, safeMin * 0.95),
+      Math.max(tickMax, safeMax * 1.05),
+    ],
+  };
 }
 
 function buildLinearTicks(yMin, yMax, targetCount = 5) {
@@ -112,7 +137,13 @@ export default function VacDevice () {
   const hasNonZeroData = positiveYValues.length > 0;
   const yMin = hasNonZeroData ? Math.min(...positiveYValues) : null;
   const yMax = hasNonZeroData ? Math.max(...positiveYValues) : null;
-  const yTicks = hasNonZeroData ? buildVacLogTicks(yMin, yMax) : undefined;
+  // buildVacGraphConfig returns scale type, ticks, and domain together
+  // so they stay in sync. Normal operation = linear scale; only switches
+  // to log when the data spans ≥ 1 decade (i.e. a spike is present).
+  const graphConfig = hasNonZeroData
+    ? buildVacGraphConfig(yMin, yMax)
+    : { scale: "linear", ticks: undefined, domain: [0, 1] };
+  const yTicks = graphConfig.ticks;
   const [min, setMin] = useState("-")
   const [max, setMax] = useState("-")
   const [average, setAverage] = useState("-")
@@ -146,16 +177,11 @@ export default function VacDevice () {
       {label: "Last 12 hours", value: "12h", bucket: "5m"},
       {label: "Last 24 hours", value: "24h", bucket: "10m"},
     ]
-  // Log scale needs an explicit positive domain. Auto-domain on log scale
-  // misbehaves when data is tightly clustered (Victory tries to show a
-  // huge range). Pad 15% above and below the actual min/max so the line
-  // doesn't kiss the axis edges.
-  let chartDomain;
-  if (!hasNonZeroData) {
-    chartDomain = { y: [0.1, 1] };
-  } else {
-    chartDomain = { y: [yMin * 0.85, yMax * 1.15] };
-  }
+  // Domain comes from buildVacGraphConfig so it's always sized to match
+  // the ticks (and pads in log space, not via fixed multipliers, so narrow
+  // data ranges don't get squashed flat by a constant ~0.13 log-units of
+  // padding that the old ×0.85 / ×1.15 approach added).
+  const chartDomain = { y: graphConfig.domain };
 
   useEffect(() => {
     AsyncStorage.getItem("graph_time_range").then((saved) => {
@@ -335,7 +361,7 @@ export default function VacDevice () {
             domain={chartDomain}
             style={{ parent: { width: "100%"} }}
             padding={{ top: 10, bottom: 20, left: 45, right: 45 }}
-            scale={{ x: "time", y: "log" }}
+            scale={{ x: "time", y: graphConfig.scale }}
           >
             <VictoryAxis
               dependentAxis
