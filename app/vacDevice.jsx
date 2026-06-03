@@ -24,9 +24,15 @@ const formatMbar = (v) => {
 // keeps small-but-meaningful changes in deep vacuum visible at the same
 // time as a vacuum-loss spike to 10+ mbar.
 //
-// Ticks are decade boundaries (0.1, 1, 10, ...). For narrow ranges
-// (≤ 2 decades visible) we also include 2× and 5× intermediates within
-// each decade so the chart doesn't look empty between major ticks.
+// Strategy:
+//   1. Try decade-aligned ticks (0.1, 1, 10, ...) plus 2× / 5× within
+//      each decade when ≤ 2 decades are visible.
+//   2. If that leaves us with fewer than 3 ticks inside the data window
+//      (which happens on short time ranges where the data is tightly
+//      clustered, e.g. 0.44 - 0.46 mbar), fall back to evenly-spaced
+//      linear nice-ticks. The axis is still log-scaled; only the *label
+//      positions* are picked linearly. For sub-2× data ranges the visual
+//      difference between log and linear is tiny anyway.
 function buildVacLogTicks(yMin, yMax) {
   if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) return undefined;
   // Log can't represent zero or negative. Calibrated pressure should never
@@ -37,25 +43,53 @@ function buildVacLogTicks(yMin, yMax) {
   const logMax = Math.ceil(Math.log10(safeMax));
   const includeMinors = (logMax - logMin) <= 2;
 
-  const ticks = [];
+  const decadeTicks = [];
   for (let p = logMin; p <= logMax; p++) {
     const decade = Math.pow(10, p);
-    ticks.push(decade);
+    decadeTicks.push(decade);
     if (includeMinors) {
-      ticks.push(2 * decade);
-      ticks.push(5 * decade);
+      decadeTicks.push(2 * decade);
+      decadeTicks.push(5 * decade);
     }
   }
-  // Trim ticks that fall well outside the visible range to avoid cluttering
-  // the axis with irrelevant labels.
-  return ticks.filter((t) => t >= safeMin * 0.5 && t <= safeMax * 2);
+  const filtered = decadeTicks.filter(
+    (t) => t >= safeMin * 0.5 && t <= safeMax * 2,
+  );
+  if (filtered.length >= 3) return filtered;
+
+  // Narrow range — use linear nice-ticks for label positioning.
+  return buildLinearTicks(safeMin, safeMax);
 }
 
-// Format ticks: sub-1 values get 2dp (0.10, 0.20, 0.50), 1+ get integer.
+function buildLinearTicks(yMin, yMax, targetCount = 5) {
+  if (yMin === yMax) return [Math.round(yMin * 100) / 100];
+  const span = yMax - yMin;
+  const rawStep = span / targetCount;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const normalized = rawStep / magnitude;
+  let step;
+  if (normalized < 1.5) step = 1 * magnitude;
+  else if (normalized < 3) step = 2 * magnitude;
+  else if (normalized < 7) step = 5 * magnitude;
+  else step = 10 * magnitude;
+  step = Math.max(step, 0.01);
+  const tickMin = Math.floor(yMin / step) * step;
+  const tickMax = Math.ceil(yMax / step) * step;
+  const ticks = [];
+  for (let v = tickMin; v <= tickMax + step / 2; v += step) {
+    ticks.push(Math.round(v * 100) / 100);
+  }
+  return ticks;
+}
+
+// Format ticks: sub-1 values get 2dp (0.10, 0.20, 0.44, 0.50);
+// integers ≥1 stay as integers (1, 2, 10, 100); other ≥1 values get 2dp.
 function formatLogTick(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return "";
-  return n < 1 ? n.toFixed(2) : String(Math.round(n));
+  if (n < 1) return n.toFixed(2);
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(2);
 }
 
 export default function VacDevice () {
