@@ -17,33 +17,45 @@ const formatMbar = (v) => {
   return Number.isFinite(n) ? n.toFixed(2) : "-";
 };
 
-// Build evenly-spaced y-axis ticks for the vacuum graph. Step size is
-// snapped to 1 / 2 / 5 × 10^k (like D3's nice-tick algorithm) and clamped
-// to ≥ 0.01 so each tick rounds to a unique 2-dp label and the gaps
-// between labels stay even — Victory's auto-chosen ticks could otherwise
-// land within 0.01 of each other and round to repeated values.
-function buildVacTicks(yMin, yMax, targetCount = 5) {
+// Build log-scale y-axis ticks for the vacuum graph. Vacuum data spans a
+// huge dynamic range (deep-vacuum ~0.3 mbar normal operation up to ~1000
+// mbar atmospheric, with spikes anywhere in between). Linear scale lets
+// one decade dominate and squashes the rest into a flat line. Log scale
+// keeps small-but-meaningful changes in deep vacuum visible at the same
+// time as a vacuum-loss spike to 10+ mbar.
+//
+// Ticks are decade boundaries (0.1, 1, 10, ...). For narrow ranges
+// (≤ 2 decades visible) we also include 2× and 5× intermediates within
+// each decade so the chart doesn't look empty between major ticks.
+function buildVacLogTicks(yMin, yMax) {
   if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) return undefined;
-  if (yMin === yMax) {
-    return [Math.round(yMin * 100) / 100];
-  }
-  const span = yMax - yMin;
-  const rawStep = span / targetCount;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-  const normalized = rawStep / magnitude;
-  let step;
-  if (normalized < 1.5) step = 1 * magnitude;
-  else if (normalized < 3) step = 2 * magnitude;
-  else if (normalized < 7) step = 5 * magnitude;
-  else step = 10 * magnitude;
-  step = Math.max(step, 0.01);
-  const tickMin = Math.floor(yMin / step) * step;
-  const tickMax = Math.ceil(yMax / step) * step;
+  // Log can't represent zero or negative. Calibrated pressure should never
+  // go below ~0.2 mbar given the calibration offset, but defend anyway.
+  const safeMin = Math.max(yMin, 0.01);
+  const safeMax = Math.max(yMax, safeMin * 1.1);
+  const logMin = Math.floor(Math.log10(safeMin));
+  const logMax = Math.ceil(Math.log10(safeMax));
+  const includeMinors = (logMax - logMin) <= 2;
+
   const ticks = [];
-  for (let v = tickMin; v <= tickMax + step / 2; v += step) {
-    ticks.push(Math.round(v * 100) / 100);
+  for (let p = logMin; p <= logMax; p++) {
+    const decade = Math.pow(10, p);
+    ticks.push(decade);
+    if (includeMinors) {
+      ticks.push(2 * decade);
+      ticks.push(5 * decade);
+    }
   }
-  return ticks;
+  // Trim ticks that fall well outside the visible range to avoid cluttering
+  // the axis with irrelevant labels.
+  return ticks.filter((t) => t >= safeMin * 0.5 && t <= safeMax * 2);
+}
+
+// Format ticks: sub-1 values get 2dp (0.10, 0.20, 0.50), 1+ get integer.
+function formatLogTick(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "";
+  return n < 1 ? n.toFixed(2) : String(Math.round(n));
 }
 
 export default function VacDevice () {
@@ -57,11 +69,16 @@ export default function VacDevice () {
   const [bucket, setBucket] = useState("10m");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [apiBase, setApiBase] = useState('');
-  const yValues = graphPoints.map((point) => point.value);
-  const hasNonZeroData = yValues.some((value) => value !== 0);
-  const yTicks = hasNonZeroData
-    ? buildVacTicks(Math.min(...yValues), Math.max(...yValues))
-    : undefined;
+  // For the log-scale axis we only consider strictly positive values. Any
+  // zero or negative entries (shouldn't happen with calibrated readings but
+  // defend anyway) are excluded from both the line and the domain.
+  const positiveYValues = graphPoints
+    .map((point) => point.value)
+    .filter((v) => Number.isFinite(v) && v > 0);
+  const hasNonZeroData = positiveYValues.length > 0;
+  const yMin = hasNonZeroData ? Math.min(...positiveYValues) : null;
+  const yMax = hasNonZeroData ? Math.max(...positiveYValues) : null;
+  const yTicks = hasNonZeroData ? buildVacLogTicks(yMin, yMax) : undefined;
   const [min, setMin] = useState("-")
   const [max, setMax] = useState("-")
   const [average, setAverage] = useState("-")
@@ -95,11 +112,15 @@ export default function VacDevice () {
       {label: "Last 12 hours", value: "12h", bucket: "5m"},
       {label: "Last 24 hours", value: "24h", bucket: "10m"},
     ]
+  // Log scale needs an explicit positive domain. Auto-domain on log scale
+  // misbehaves when data is tightly clustered (Victory tries to show a
+  // huge range). Pad 15% above and below the actual min/max so the line
+  // doesn't kiss the axis edges.
   let chartDomain;
   if (!hasNonZeroData) {
-    chartDomain = { y: [0, 1] };
+    chartDomain = { y: [0.1, 1] };
   } else {
-    chartDomain = undefined;
+    chartDomain = { y: [yMin * 0.85, yMax * 1.15] };
   }
 
   useEffect(() => {
@@ -230,10 +251,12 @@ export default function VacDevice () {
   return () => clearInterval(id);
   }, [mac, timeRange, bucket, preferencesLoaded, apiBase]);
 
-  const victoryPoints = graphPoints.map((p) => ({
-        x: p.date,
-        y: p.value,
-  }));
+  // Filter out non-positive points before rendering — log scale can't
+  // represent zero or negative values and would silently drop them anyway,
+  // but excluding them up front avoids Victory throwing warnings.
+  const victoryPoints = graphPoints
+    .filter((p) => Number.isFinite(p.value) && p.value > 0)
+    .map((p) => ({ x: p.date, y: p.value }));
 
   return (
     <View style={styles.container}>
@@ -278,13 +301,12 @@ export default function VacDevice () {
             domain={chartDomain}
             style={{ parent: { width: "100%"} }}
             padding={{ top: 10, bottom: 20, left: 45, right: 45 }}
-            domainPadding={{ y: 20 }}
-            scale={{ x: "time" }}
+            scale={{ x: "time", y: "log" }}
           >
             <VictoryAxis
               dependentAxis
               tickValues={yTicks}
-              tickFormat={(tickValue) => Number(tickValue).toFixed(2)}
+              tickFormat={formatLogTick}
               style={{
                 tickLabels: { fontSize: 10, fill: "#4B5563" },
               }}
