@@ -137,7 +137,7 @@ export default function Menu () {
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.push({pathname: "/mutedDevices"})}>
           <View style={styles.settings_container}>
-            <Text style={styles.optionText}>Manage Alert Notifications</Text>
+            <Text style={styles.optionText}>Mute Devices</Text>
             <RightIcon width = {24} height = {24 } stroke="#6B7280"/>
           </View>
         </TouchableOpacity>

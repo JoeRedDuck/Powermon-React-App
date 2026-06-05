@@ -3,14 +3,14 @@
     "name": "Prozomix Powermon",
     "slug": "Powermon",
     "owner": "joeredduck",
-    "version": "1.1.2",
+    "version": "1.1.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "powermon",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "buildNumber": "12",
+      "buildNumber": "14",
       "supportsTablet": true,
       "bundleIdentifier": "com.prozomix.powermon",
       "infoPlist": {

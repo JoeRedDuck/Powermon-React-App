@@ -1072,13 +1072,17 @@ DELETE /api/v1/vacuum/systems/{name}
 
 ### Vacuum Monitors CRUD
 ```
-GET    /api/v1/vacuum/monitors                 # [{id, mac, system_name}]
-POST   /api/v1/vacuum/monitors                 # body: {id, mac, system_name?}
+GET    /api/v1/vacuum/monitors                 # [{id, mac, name, system_name}]
+POST   /api/v1/vacuum/monitors                 # body: {id, mac, name?, system_name?}
+PUT    /api/v1/vacuum/monitors/{id}            # body: {name?, system_name?}
+                                                #   value sets, "" clears, absent leaves alone
 DELETE /api/v1/vacuum/monitors/{id}            # cascades polls
 POST   /api/v1/vacuum/monitors/{id}/reassign?system_name=...
 POST   /api/v1/vacuum/monitors/{id}/unassign
 POST   /api/v1/vacuum/monitors/notify-discovered  # called by powermon4 on unknown MAC
 ```
+
+**Multi-gauge per system.** A `VacSystem` can host multiple `VacMonitor` rows; each gauge has its own `name` (e.g. "Inlet", "Chamber"). `GET /api/v1/vacuum/status` returns one entry per system with a `gauges: [{mac, id, name, last_seen, last_pressure}, ...]` array; the top-level `mac` / `last_pressure` / `last_seen` mirror the primary gauge (lowest id) for backward compatibility.
 
 ### Polls (data ingestion)
 ```
