@@ -613,6 +613,62 @@ No body required
 
 ---
 
+## Kiosk Tokens
+
+Persistent device tokens for unattended wall displays. Mint one on a laptop, store it on the wall device's browser, and the wall display reads dashboards without ever needing to re-login. Tokens never expire — revocation via DELETE is the only way to disable one.
+
+Token format: `pmkiosk_<32-byte-urlsafe-b64>`. SHA-256 of the raw token is stored in the DB; the raw token is returned **once** at creation and never again.
+
+```
+POST   /api/v1/auth/kiosk-tokens      # body: {label, scope?}; returns raw token ONCE
+GET    /api/v1/auth/kiosk-tokens      # list owned by caller; no token field
+DELETE /api/v1/auth/kiosk-tokens/{id} # 204
+```
+
+All three endpoints require regular user auth (`Authorization: Bearer <jwt>`). A kiosk token cannot mint more kiosk tokens — that path requires `get_current_user`, which rejects `pmkiosk_*` tokens.
+
+**Scope:** `dashboards.read` is the only defined scope. Kiosk tokens may be used to call:
+- `GET /api/v1/dashboards`
+- `GET /api/v1/dashboards/{name}`
+
+PUT/DELETE on dashboards require regular user auth and reject kiosk tokens with 401.
+
+---
+
+## Dashboards
+
+Per-user named layout JSON. Web app stores its dashboard composition (cards, grid positions, polling intervals) here; the backend treats the body as opaque.
+
+```
+GET    /api/v1/dashboards              # [{name, title, updated_at, version}]  (no body)
+GET    /api/v1/dashboards/{name}       # {name, title, body, version, updated_at}
+PUT    /api/v1/dashboards/{name}       # body: {title, body, version}; upsert with optimistic concurrency
+DELETE /api/v1/dashboards/{name}       # 204, idempotent
+```
+
+Auth: GETs accept either a JWT access token OR a kiosk token with `dashboards.read` scope. PUT/DELETE require JWT only.
+
+**Optimistic concurrency.** PUT body must include the client's current `version`. On match the row is updated and `version` increments by 1. On mismatch the response is **409 with the current server-side row payload** so the web app can re-sync without a second round-trip:
+
+```json
+// 409 Conflict response (the detail IS the full current row)
+{
+  "detail": {
+    "name": "wall",
+    "title": "Freeze Dryer Wall",
+    "body": { "...": "..." },
+    "version": 7,
+    "updated_at": "2026-06-10T14:32:11Z"
+  }
+}
+```
+
+On initial create, `version` in the request is ignored — the server starts at 1.
+
+**Naming.** Dashboard names are scoped to the owner. Alice's "wall" and Bob's "wall" are separate rows; neither sees the other.
+
+---
+
 ### Forgot Password
 ```
 POST /api/v1/auth/forgot-password
