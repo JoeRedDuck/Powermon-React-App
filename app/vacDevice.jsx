@@ -57,8 +57,12 @@ function buildVacGraphConfig(yMin, yMax) {
   }
 
   // Spike-event view. Log scale, decade-aligned ticks (plus 2x / 5x
-  // intermediates when ≤ 2 decades are visible).
-  const logFloor = Math.floor(Math.log10(safeMin));
+  // intermediates when ≤ 2 decades are visible). Floor is locked at 0.1
+  // mbar (a decade below normal steady-state ~0.5 mbar) so the operating
+  // band has visual headroom above the axis floor — without this, the
+  // band sits squashed against the bottom of the graph during a vent.
+  const VAC_LOG_FLOOR = 0.1;
+  const logFloor = Math.min(Math.floor(Math.log10(safeMin)), -1);
   const logCeil  = Math.ceil(Math.log10(safeMax));
   const includeMinors = (logCeil - logFloor) <= 2;
 
@@ -72,7 +76,7 @@ function buildVacGraphConfig(yMin, yMax) {
     }
   }
   const ticksInRange = decadeTicks.filter(
-    (t) => t >= safeMin * 0.5 && t <= safeMax * 2,
+    (t) => t >= VAC_LOG_FLOOR && t <= safeMax * 2,
   );
   const tickMin = ticksInRange.length ? Math.min(...ticksInRange) : safeMin;
   const tickMax = ticksInRange.length ? Math.max(...ticksInRange) : safeMax;
