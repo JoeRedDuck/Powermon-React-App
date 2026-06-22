@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { router, Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import { useEffect, useState } from 'react';
@@ -33,6 +34,14 @@ Notifications.setNotificationHandler({
 });
 
 export default function RootLayout() {
+  // IBM Plex Mono for the vacuum gauge readout (matches the web app). The
+  // error slot is load-bearing: without it, a missing/corrupt font file
+  // would hang the whole app on the loading screen forever. We proceed once
+  // fonts are loaded OR errored — on error RN falls back to a system font.
+  const [fontsLoaded, fontError] = useFonts({
+    "IBMPlexMono-Regular": require("../assets/fonts/IBMPlexMono-Regular.ttf"),
+    "IBMPlexMono-SemiBold": require("../assets/fonts/IBMPlexMono-SemiBold.ttf"),
+  });
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [testMode, setTestModeState] = useState(false);
@@ -117,8 +126,11 @@ export default function RootLayout() {
     setFilterOpen(false); 
   }
 
-  // Show loading spinner while checking auth
-  if (!authChecked) {
+  // Show loading spinner while checking auth or loading fonts. Proceed once
+  // fonts resolve either way (loaded or errored) so a font failure can't
+  // brick startup.
+  const fontsReady = fontsLoaded || fontError;
+  if (!authChecked || !fontsReady) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView style={{ backgroundColor: "#0F1724", flex: 1, justifyContent: "center", alignItems: "center" }}>

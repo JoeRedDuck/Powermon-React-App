@@ -1,168 +1,139 @@
 import { StyleSheet, View } from "react-native";
 import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 
-const MIN_PRESSURE = 0.1;
-const MAX_PRESSURE = 1000;
-const LOG_MIN = Math.log10(MIN_PRESSURE); // -1
-const LOG_MAX = Math.log10(MAX_PRESSURE); // 3
-const LOG_RANGE = LOG_MAX - LOG_MIN;       // 4
+/**
+ * VacuumGauge — logarithmic vacuum gauge (0.1–1000 mbar).
+ *
+ * React Native port of the web app's VacuumGauge2, so the two look identical:
+ * 240° arc, green below the limit / red above, filled triangular needle,
+ * threshold marker, and IBM Plex Mono readout (loaded in app/_layout.jsx).
+ *
+ * Differences from the web component, both intentional:
+ *   - No animation — the needle snaps to the value (matches prior mobile
+ *     behaviour and avoids per-frame SVG re-renders on the polling dashboard).
+ *   - Offline state — when `pressure` is null/≤0 the dial still renders but
+ *     the value shows "—" and the needle is hidden.
+ *
+ * Prop is `pressure` (unchanged from the previous gauge) so both callsites
+ * keep working untouched.
+ */
 
-// Arc: 270° sweep, gap at the bottom
-// Angles measured clockwise from 12 o'clock (0° = top)
-const START_ANGLE = 225; // ~7:30 position (lower-left)
-const SWEEP = 270;       // ends at 225+270 = 495° = 135° (~4:30, lower-right)
+const MONO_REG = "IBMPlexMono-Regular";
+const MONO_SEMI = "IBMPlexMono-SemiBold";
+const GREEN = "#5BB85C";
+const RED = "#E25141";
 
-// Color zones (each = 1 logarithmic decade = 25% of arc)
-const ZONES = [
-  { from: 0.1, to: 1,    color: "#4ADE80" }, // Green — good vacuum
-  { from: 1,   to: 10,   color: "#FACC15" }, // Yellow — marginal
-  { from: 10,  to: 100,  color: "#FB923C" }, // Orange — poor
-  { from: 100, to: 1000, color: "#F87171" }, // Red — vacuum loss
-];
+const MIN = 0.1;
+const MAX = 1000;
+const LMIN = Math.log10(MIN);
+const LMAX = Math.log10(MAX);
+const tOf = (v) => (Math.log10(v) - LMIN) / (LMAX - LMIN);
 
-const TICKS = [0.1, 1, 10, 100, 1000];
+// ---- SVG geometry (verbatim from the web design) ----
+const cx = 115, cy = 118, R = 80, tw = 13;
+const a0 = -120, span = 240;
+const ang = (t) => a0 + t * span;
+const pol = (r, a) => {
+  const rad = (a * Math.PI) / 180;
+  return [cx + r * Math.sin(rad), cy - r * Math.cos(rad)];
+};
+const arc = (r, x0a, x1a) => {
+  const [x0, y0] = pol(r, x0a);
+  const [x1, y1] = pol(r, x1a);
+  const large = Math.abs(x1a - x0a) > 180 ? 1 : 0;
+  const sweep = x1a > x0a ? 1 : 0;
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} ${sweep} ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+};
 
-function pressureToAngle(pressure) {
-  const clamped = Math.max(MIN_PRESSURE, Math.min(MAX_PRESSURE, pressure));
-  const normalized = (Math.log10(clamped) - LOG_MIN) / LOG_RANGE;
-  return START_ANGLE + normalized * SWEEP;
-}
+const DECADE_LABELS = ["0.1", "1", "10", "100", "1000"];
+const DECS = [0, 0.25, 0.5, 0.75, 1];
 
-// Convert clock-style angle to SVG cartesian coordinates
-// 0° = 12 o'clock (top), 90° = 3 o'clock (right), clockwise
-function toXY(cx, cy, r, angleDeg) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return {
-    x: cx + r * Math.cos(rad),
-    y: cy + r * Math.sin(rad),
-  };
-}
-
-function arcPath(cx, cy, r, startDeg, endDeg) {
-  const s = toXY(cx, cy, r, startDeg);
-  const e = toXY(cx, cy, r, endDeg);
-  const large = endDeg - startDeg > 180 ? 1 : 0;
-  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
-}
-
-export default function VacuumGauge({ pressure }) {
-  const svgW = 300;
-  const svgH = 240;
-  const cx = svgW / 2;
-  const cy = 135;
-  const R = 100;           // arc centerline radius
-  const arcThick = 22;     // arc band width
-
+export default function VacuumGauge({ pressure, limit = 2 }) {
   const hasPressure = pressure != null && pressure > 0;
-  const needleAngle = hasPressure ? pressureToAngle(pressure) : START_ANGLE;
+  const value = hasPressure ? pressure : MIN;
 
-  // Format display value — always three decimal places. Stats row and graph
-  // axis stay at 2 dp; the gauge is the spot users zoom in on for precision.
-  const displayValue = hasPressure ? pressure.toFixed(3) : "—";
+  const targetT = Math.max(0, Math.min(1, tOf(value)));
+  const tLimit = Math.max(0, Math.min(1, tOf(limit)));
+  const na = ang(targetT);
+
+  const valueLabel = !hasPressure
+    ? "—"
+    : value >= 100 ? value.toFixed(0)
+    : value >= 10 ? value.toFixed(1)
+    : value >= 1 ? value.toFixed(2)
+    : value >= 0.001 ? value.toFixed(3)
+    : value.toExponential(1);
+
+  // Minor ticks (2×–9× each decade, capped at MAX).
+  const minorTicks = [];
+  for (let d = 0; d < 4; d++) {
+    for (let m = 2; m <= 9; m++) {
+      const v = MIN * Math.pow(10, d) * m;
+      if (v > MAX) break;
+      const a = ang(tOf(v));
+      const [x1, y1] = pol(R + tw / 2 - 5, a);
+      const [x2, y2] = pol(R + tw / 2, a);
+      minorTicks.push(
+        <Line key={`mn${d}-${m}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fff" strokeWidth={0.9} opacity={0.5} />
+      );
+    }
+  }
+
+  // Decade ticks + labels.
+  const decadeTicks = DECS.flatMap((t, i) => {
+    const a = ang(t);
+    const [x1, y1] = pol(R - tw / 2, a);
+    const [x2, y2] = pol(R + tw / 2, a);
+    const [lx, ly] = pol(R + tw / 2 + 12, a);
+    return [
+      <Line key={`mt${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fff" strokeWidth={1.6} />,
+      <SvgText key={`dl${i}`} x={lx} y={ly + 3.5} textAnchor="middle" fontSize={10.5} fill="#8a96a3" fontFamily={MONO_REG}>{DECADE_LABELS[i]}</SvgText>,
+    ];
+  });
+
+  // Threshold marker.
+  const thA = ang(tLimit);
+  const [thx1, thy1] = pol(R - tw / 2 - 3, thA);
+  const [thx2, thy2] = pol(R + tw / 2 + 5, thA);
+  const [thlx, thly] = pol(R + tw / 2 + 13, thA);
 
   return (
     <View style={styles.container}>
-      <Svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
+      <Svg width={300} height={240} viewBox="-5 -5 240 192">
+        <Path d={arc(R, ang(0), ang(tLimit) - 1.4)} stroke={GREEN} strokeWidth={tw} fill="none" />
+        <Path d={arc(R, ang(tLimit) + 1.4, ang(1))} stroke={RED} strokeWidth={tw} fill="none" />
 
-        {/* Background arc (dark track) */}
-        <Path
-          d={arcPath(cx, cy, R, START_ANGLE, START_ANGLE + SWEEP)}
-          stroke="#1E293B"
-          strokeWidth={arcThick + 2}
-          fill="none"
-          strokeLinecap="round"
-        />
+        {minorTicks}
+        {decadeTicks}
 
-        {/* Colored zone arcs */}
-        {ZONES.map((zone, i) => (
-          <Path
-            key={i}
-            d={arcPath(cx, cy, R, pressureToAngle(zone.from), pressureToAngle(zone.to))}
-            stroke={zone.color}
-            strokeWidth={arcThick}
-            fill="none"
-            strokeLinecap="butt"
-          />
-        ))}
+        <Line x1={thx1} y1={thy1} x2={thx2} y2={thy2} stroke="#2b3440" strokeWidth={2.6} strokeLinecap="round" />
+        <SvgText x={thlx} y={thly + 3.5} textAnchor="middle" fontSize={11} fill="#2b3440" fontFamily={MONO_SEMI}>{limit}</SvgText>
 
-        {/* Major tick marks + labels */}
-        {TICKS.map((tick) => {
-          const a = pressureToAngle(tick);
-          const outer = toXY(cx, cy, R + arcThick / 2 + 2, a);
-          const inner = toXY(cx, cy, R + arcThick / 2 - 6, a);
-          const lbl = toXY(cx, cy, R + arcThick / 2 + 18, a);
-          const label = tick < 1 ? tick.toFixed(1) : String(tick);
-          return (
-            <G key={tick}>
-              <Line
-                x1={inner.x} y1={inner.y}
-                x2={outer.x} y2={outer.y}
-                stroke="#FFFFFF"
-                strokeWidth={2}
-              />
-              <SvgText
-                x={lbl.x} y={lbl.y}
-                fontSize={12}
-                fontWeight="600"
-                fill="#6B7280"
-                textAnchor="middle"
-                alignmentBaseline="central"
-              >
-                {label}
-              </SvgText>
-            </G>
-          );
-        })}
-
-        {/* Minor tick marks */}
-        {[0.2, 0.3, 0.5, 2, 3, 5, 20, 30, 50, 200, 300, 500].map((tick) => {
-          const a = pressureToAngle(tick);
-          const outer = toXY(cx, cy, R + arcThick / 2 + 1, a);
-          const inner = toXY(cx, cy, R + arcThick / 2 - 3, a);
-          return (
-            <Line
-              key={tick}
-              x1={inner.x} y1={inner.y}
-              x2={outer.x} y2={outer.y}
-              stroke="#FFFFFF"
-              strokeWidth={1}
-            />
-          );
-        })}
-
-        {/* Needle */}
         {hasPressure && (
-          <>
-            <Line
-              x1={cx} y1={cy}
-              x2={toXY(cx, cy, R - arcThick / 2 - 6, needleAngle).x}
-              y2={toXY(cx, cy, R - arcThick / 2 - 6, needleAngle).y}
-              stroke="#93C5FD"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-            />
-          </>
+          <G rotation={na} originX={cx} originY={cy}>
+            <Path d={`M ${cx} ${cy - (R - tw / 2 + 4)} L ${cx - 3} ${cy + 8} L ${cx + 3} ${cy + 8} Z`} fill="#2b3440" />
+            <Circle cx={cx} cy={cy} r={7.5} fill="#2b3440" />
+            <Circle cx={cx} cy={cy} r={3} fill="#fff" />
+          </G>
         )}
 
-        {/* Center pivot */}
-        <Circle cx={cx} cy={cy} r={6} fill="#D1D5DB" />
-        <Circle cx={cx} cy={cy} r={3} fill="#6B7280" />
-
-        {/* Digital readout inside the arc */}
         <SvgText
-          x={cx} y={cy + 30}
-          fontSize={32}
-          fontWeight="bold"
-          fill="#111827"
+          x={cx} y={cy + 38}
           textAnchor="middle"
+          fontSize={34}
+          fill="#1f2a37"
+          fontFamily={MONO_SEMI}
+          letterSpacing={-1}
         >
-          {displayValue}
+          {valueLabel}
         </SvgText>
         <SvgText
-          x={cx} y={cy + 50}
-          fontSize={14}
-          fill="#6B7280"
+          x={cx} y={cy + 53}
           textAnchor="middle"
+          fontSize={10.5}
+          fill="#8a96a3"
+          fontFamily={MONO_REG}
+          letterSpacing={0.4}
         >
           mbar
         </SvgText>
